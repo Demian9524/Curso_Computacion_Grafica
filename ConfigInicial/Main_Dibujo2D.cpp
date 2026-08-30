@@ -114,13 +114,13 @@ int main()
     Color negro = { 0.0f, 0.0f, 0.0f };
     Color verdeOscuro = { 0.16f, 0.37f, 0.00f };
     Color verdeMedio = { 0.43f, 0.71f, 0.08f };
-    Color verdeClaro = { 0.70f, 0.86f, 0.20f };
+    Color verdeClaro = { 0.70f, 0.86f, 0.20f };\
     Color verdeBrillante = { 0.26f, 0.86f, 0.05f };
     Color crema = { 0.90f, 0.90f, 0.70f };
 
     //CABEZA
 
- // fila 1
+    // fila 1
     agregarRect(vertices, indices, 9, 0, 6, 1, COLS, FILAS, negro);
     agregarRect(vertices, indices, 20, 0, 4, 1, COLS, FILAS, negro);
 
@@ -498,3 +498,7 @@ void resize(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
+
+//Subiendo ahora la version de dibujo 2D, hubo un pequeno error, debido a que estuve trabajando en el 
+//laboratorio sobre el mismo archivo de configuracion inicial, el configuracion inicial original quedo modificado, 
+// por lo que ya no puedo acceder a el y subirlo a github, por lo que mejor subo el de dibujo 2D dos veces, el configuracion inicial original quedo inaccesible.
