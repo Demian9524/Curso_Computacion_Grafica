@@ -70,7 +70,7 @@ int main()
     GLFWwindow* window = glfwCreateWindow(
         WIDTH,
         HEIGHT,
-        "Bello Zaragoza Demian",
+        "Práctica #2 Bello Zaragoza Demian",
         NULL,
         NULL
     );
