@@ -31,7 +31,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main_Modelado.cpp">
+    <ClCompile Include="Practica4_ModeladoGeometrico.cpp">
       <Filter>Archivos de origen\Shader</Filter>
     </ClCompile>
   </ItemGroup>

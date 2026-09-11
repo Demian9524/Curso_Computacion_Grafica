@@ -26,7 +26,7 @@
     <None Include="Shader\core.vs" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main_Modelado.cpp" />
+    <ClCompile Include="Practica4_ModeladoGeometrico.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -87,12 +87,12 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLEW\include;C:\Users\demia\Desktop\Curso_Computacion_Grafica\External Libraries\glm;C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLFW\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External Libraries\GLFW\include;$(SolutionDir)External Libraries\GLEW\include;$(SolutionDir)External Libraries\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLEW\lib\Release\Win32;C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLFW\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)External Libraries\GLEW\lib\Release\Win32;$(SolutionDir)External Libraries\GLFW\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glew32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
@@ -108,12 +108,12 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLEW\include;C:\Users\demia\Desktop\Curso_Computacion_Grafica\External Libraries\glm;C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLFW\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External Libraries\GLFW\include;$(SolutionDir)External Libraries\GLEW\include;$(SolutionDir)External Libraries\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLEW\lib\Release\Win32;C:\Users\demia\Desktop\ConfigInicial\External Libraries\GLFW\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)External Libraries\GLEW\lib\Release\Win32;$(SolutionDir)External Libraries\GLFW\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glew32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>

@@ -1,6 +1,6 @@
-// previo práctica #4
+// práctica #4
 // Bello Zaragoza Demian
-// Fecha de entrega 07 septiembre 2026
+// Fecha de entrega 12 septiembre 2026
 // Número de cuenta 320200928
 
 #include <iostream>
@@ -38,7 +38,7 @@ int main()
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(
-        WIDTH, HEIGHT, "Modelado geometrico", nullptr, nullptr
+        WIDTH, HEIGHT, "Practica #4 Bello Zaragoza Demian", nullptr, nullptr
     );
 
     if (window == nullptr)
@@ -131,6 +131,7 @@ int main()
     GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
     GLint projecLoc = glGetUniformLocation(ourShader.Program, "projection");
     GLint colorLoc = glGetUniformLocation(ourShader.Program, "objectColor");
+    GLint scaleLoc = glGetUniformLocation(ourShader.Program, "objectScale");
 
     tiempoAnterior = glfwGetTime();
 
@@ -146,7 +147,7 @@ int main()
         glfwPollEvents();
         Inputs(window);
 
-        glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
+        glClearColor(0.62f, 0.80f, 0.98f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         ourShader.Use();
@@ -170,77 +171,220 @@ int main()
 
         glBindVertexArray(VAO);
 
-        // Función reutilizable: dibuja un cubo con el modelo y color indicados.
-        auto dibujarCubo = [&](glm::mat4 modelo, glm::vec3 color)
+        // Función reutilizable: ahora también recibe la escala.
+        auto dibujarCubo = [&](glm::mat4 modelo, glm::vec3 color, glm::vec3 escala)
             {
                 glUniformMatrix4fv(
                     modelLoc, 1, GL_FALSE, glm::value_ptr(modelo)
                 );
 
-                glUniform3fv(colorLoc, 1, glm::value_ptr(color));
+                glUniform3fv(
+                    colorLoc, 1, glm::value_ptr(color)
+                );
+
+                glUniform3fv(
+                    scaleLoc, 1, glm::value_ptr(escala)
+                );
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             };
 
         // Cabeza: blanca.
-        glm::mat4 model = glm::mat4(1.0f);//una declaracion de model
-        model = glm::scale(model, glm::vec3(0.8f, 1.45f, 0.77f));
-        model = glm::translate(model, glm::vec3(0.0f, 0.28f, 0.0f));
-        dibujarCubo(model, glm::vec3(0.8706f, 0.8706f, 0.8706f));
+        glm::vec3 escalaCabeza(0.90f, 1.375f, 0.77f);
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaCabeza);
+        model = glm::translate(model, glm::vec3(0.0f, 0.3f, 0.0f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.8706f, 0.8706f, 0.8706f),
+            escalaCabeza
+        );
 
         // Ojo derecho
+        glm::vec3 escalaOjo(0.225f, 0.25f, 0.1f);
+
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.225f, 0.25f, 0.1f));
-        model = glm::translate(model, glm::vec3(1.2f, 3.0f, 4.0f));
-        dibujarCubo(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, escalaOjo);
+        model = glm::translate(model, glm::vec3(1.5f, 3.0f, 4.0f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            escalaOjo
+        );
 
         // Ojo izquierdo
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.225f, 0.25f, 0.1f));
-        model = glm::translate(model, glm::vec3(-1.2f, 3.0f, 4.0f));
-        dibujarCubo(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, escalaOjo);
+        model = glm::translate(model, glm::vec3(-1.5f, 3.0f, 4.0f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            escalaOjo
+        );
 
         // Pico arriba.
+        glm::vec3 escalaPico(0.9f, 0.20f, 0.55f);
+
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.8f, 0.25f, 0.6f));
-        model = glm::translate(model, glm::vec3(0.0f, 2.0f, 1.0f));
-        dibujarCubo(model, glm::vec3(0.749f, 0.573f, 0.259f));
+        model = glm::scale(model, escalaPico);
+        model = glm::translate(model, glm::vec3(0.0f, 2.6f, 1.1f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.749f, 0.573f, 0.259f),
+            escalaPico
+        );
 
         // Pico abajo.
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.8f, 0.25f, 0.6f));
-        model = glm::translate(model, glm::vec3(0.0f, 1.0f, 1.0f));
-        dibujarCubo(model, glm::vec3(0.573f, 0.447f, 0.192f));
+        model = glm::scale(model, escalaPico);
+        model = glm::translate(model, glm::vec3(0.0f, 1.6f, 1.1f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.573f, 0.447f, 0.192f),
+            escalaPico
+        );
 
         // Papada.
+        glm::vec3 escalaPapada(0.4f, 0.5f, 0.35f);
+
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.4f, 0.65f, 0.3f));
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.5f));
-        dibujarCubo(model, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, escalaPapada);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.3f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            escalaPapada
+        );
 
         // Cuerpo
+        glm::vec3 escalaCuerpo(1.375f, 1.375f, 1.83f);
+
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(1.0f, 1.45f, 1.77f));
-        model = glm::translate(model, glm::vec3(1.0f, 1.28f, 1.0f));
-        dibujarCubo(model, glm::vec3(0.8706f, 0.8706f, 0.8706f));
+        model = glm::scale(model, escalaCuerpo);
+        model = glm::translate(model, glm::vec3(0.0f, -0.325f, -0.55f));
 
-        //// PATA 2: naranja.
-        //model = glm::mat4(1.0f);
-        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        //model = glm::translate(model, glm::vec3(-4.5f, -0.45f, 2.833333f));
-        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
+        dibujarCubo(
+            model,
+            glm::vec3(0.8706f, 0.8706f, 0.8706f),
+            escalaCuerpo
+        );
 
-        //// PATA 3: naranja.
-        //model = glm::mat4(1.0f);
-        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        //model = glm::translate(model, glm::vec3(-4.5f, -0.45f, -2.833333f));
-        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
+        // Ala Derecha
+        glm::vec3 escalaAla(0.275f, 0.916f, 1.375f);
 
-        //// PATA 4: naranja.
-        //model = glm::mat4(1.0f);
-        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        //model = glm::translate(model, glm::vec3(4.5f, -0.45f, -2.833333f));
-        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaAla);
+        model = glm::translate(model, glm::vec3(-3.0f, -0.29f, -0.75f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.8706f, 0.8706f, 0.8706f),
+            escalaAla
+        );
+
+        // Ala Izquerda
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaAla);
+        model = glm::translate(model, glm::vec3(3.0f, -0.29f, -0.75f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.8706f, 0.8706f, 0.8706f),
+            escalaAla
+        );
+
+        // Patita Derecha
+        glm::vec3 escalaPatita(0.275f, 1.2f, 0.1f);
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaPatita);
+        model = glm::translate(model, glm::vec3(1.25f, -1.425f, -9.50f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.9529f, 0.8627f, 0.4196f),
+            escalaPatita
+        );
+
+        // Patita Izquierda
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaPatita);
+        model = glm::translate(model, glm::vec3(-1.25f, -1.425f, -9.50f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.9529f, 0.8627f, 0.4196f),
+            escalaPatita
+        );
+
+
+        // Pies
+        glm::vec3 escalaPies(1.2f, 0.1f, 0.5f);
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaPies);
+        model = glm::translate(model, glm::vec3(0.0f, -23.0f, -1.35f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.9529f, 0.8627f, 0.4196f),
+            escalaPies
+        );
+
+        // Dedo del pie derecho
+        glm::vec3 escalaDedoPie(0.25f, 0.1f, 0.25f);
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaDedoPie);
+        model = glm::translate(model, glm::vec3(1.25f, -23.0f, -1.25f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.9529f, 0.8627f, 0.4196f),
+            escalaDedoPie
+        );
+
+        // Dedo del pie izquierdo
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, escalaDedoPie);
+        model = glm::translate(model, glm::vec3(-1.25f, -23.0f, -1.25f));
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.9529f, 0.8627f, 0.4196f),
+            escalaDedoPie
+        );
+
+        // Capa de tierra
+        glm::vec3 escalaTierra(30.0f, 1.0f, 30.0f);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -2.92f, 0.0f));
+        model = glm::scale(model, escalaTierra);
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.45f, 0.30f, 0.14f),   // color base tierra
+            escalaTierra
+        );
+
+
+        // Capa superior de pasto
+        glm::vec3 escalaPasto(30.0f, 1.0f, 30.0f);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -2.9f, 0.0f));
+        model = glm::scale(model, escalaPasto);
+
+        dibujarCubo(
+            model,
+            glm::vec3(0.35f, 0.65f, 0.18f),   // color base pasto
+            escalaPasto
+        );
 
         glBindVertexArray(0);
 
@@ -258,8 +402,8 @@ int main()
 
 void Inputs(GLFWwindow* window)
 {
-    const float velocidadMovimiento = 0.6f;
-    const float velocidadRotacion = 20.0f;
+    const float velocidadMovimiento = 1.0f;
+    const float velocidadRotacion = 50.0f;
 
     float paso = velocidadMovimiento * deltaTime;
     float giro = velocidadRotacion * deltaTime;
@@ -292,4 +436,9 @@ void Inputs(GLFWwindow* window)
 
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
         rot -= giro;
-}//pequena caratula, con numero de equipo NO NOMBRES COMPLETOS, presentacion de equipo: nombre integrantes, nombre equipo, numero de cuenta y correo de los integrantes,PALETA DE COLORES, TIPOGRAFIA
+}
+
+// pequena caratula, con numero de equipo NO NOMBRES COMPLETOS,
+// presentacion de equipo: nombre integrantes, nombre equipo,
+// numero de cuenta y correo de los integrantes,
+// PALETA DE COLORES, TIPOGRAFIA
