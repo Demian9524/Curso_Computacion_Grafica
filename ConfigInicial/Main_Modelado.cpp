@@ -1,12 +1,10 @@
-//previo práctica #4
-//Bello Zaragoza Demian
-//Fecha de entrega 07 septiembre 2026
-//Número de cuenta 320200928
+// previo práctica #4
+// Bello Zaragoza Demian
+// Fecha de entrega 07 septiembre 2026
+// Número de cuenta 320200928
 
 #include <iostream>
 #include <cstdlib>
-
-//#define GLEW_STATIC
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -26,7 +24,6 @@ float movY = 0.0f;
 float movZ = -5.0f;
 float rot = 0.0f;
 
-// Tiempo entre fotogramas.
 float deltaTime = 0.0f;
 double tiempoAnterior = 0.0;
 
@@ -38,21 +35,12 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Opciones de compatibilidad del codigo original.
-    /*
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    */
-
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(
         WIDTH, HEIGHT, "Modelado geometrico", nullptr, nullptr
     );
 
-    // Primero comprobar que la ventana se creo correctamente.
     if (window == nullptr)
     {
         std::cout << "Error al crear la ventana." << std::endl;
@@ -76,63 +64,41 @@ int main()
     }
 
     glViewport(0, 0, screenWidth, screenHeight);
-
     glEnable(GL_DEPTH_TEST);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     Shader ourShader("Shader/core.vs", "Shader/core.frag");
 
-    // Cubo base: posicion (X, Y, Z) y color (R, G, B).
+    // Cubo base: solamente posiciones X, Y, Z.
     float vertices[] = {
-        // Frente: rojo.
-        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
+        // Frente
+        -0.5f, -0.5f,  0.5f,   0.5f, -0.5f,  0.5f,
+         0.5f,  0.5f,  0.5f,   0.5f,  0.5f,  0.5f,
+        -0.5f,  0.5f,  0.5f,  -0.5f, -0.5f,  0.5f,
 
-        // Atras: verde.
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
+        // Atrás
+        -0.5f, -0.5f, -0.5f,   0.5f, -0.5f, -0.5f,
+         0.5f,  0.5f, -0.5f,   0.5f,  0.5f, -0.5f,
+        -0.5f,  0.5f, -0.5f,  -0.5f, -0.5f, -0.5f,
 
-        // Derecha: azul.
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
+        // Derecha
+         0.5f, -0.5f,  0.5f,   0.5f, -0.5f, -0.5f,
+         0.5f,  0.5f, -0.5f,   0.5f,  0.5f, -0.5f,
+         0.5f,  0.5f,  0.5f,   0.5f, -0.5f,  0.5f,
 
-         // Izquierda: amarillo.
-         -0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-         -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-         -0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-         -0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-         -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-         -0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
+         // Izquierda
+         -0.5f,  0.5f,  0.5f,  -0.5f,  0.5f, -0.5f,
+         -0.5f, -0.5f, -0.5f,  -0.5f, -0.5f, -0.5f,
+         -0.5f, -0.5f,  0.5f,  -0.5f,  0.5f,  0.5f,
 
-         // Abajo: cian.
-         -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         -0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
+         // Abajo
+         -0.5f, -0.5f, -0.5f,   0.5f, -0.5f, -0.5f,
+          0.5f, -0.5f,  0.5f,   0.5f, -0.5f,  0.5f,
+         -0.5f, -0.5f,  0.5f,  -0.5f, -0.5f, -0.5f,
 
-         // Arriba: rosa.
-         -0.5f,  0.5f, -0.5f,  1.0f, 0.2f, 0.5f,
-          0.5f,  0.5f, -0.5f,  1.0f, 0.2f, 0.5f,
-          0.5f,  0.5f,  0.5f,  1.0f, 0.2f, 0.5f,
-          0.5f,  0.5f,  0.5f,  1.0f, 0.2f, 0.5f,
-         -0.5f,  0.5f,  0.5f,  1.0f, 0.2f, 0.5f,
-         -0.5f,  0.5f, -0.5f,  1.0f, 0.2f, 0.5f
+         // Arriba
+         -0.5f,  0.5f, -0.5f,   0.5f,  0.5f, -0.5f,
+          0.5f,  0.5f,  0.5f,   0.5f,  0.5f,  0.5f,
+         -0.5f,  0.5f,  0.5f,  -0.5f,  0.5f, -0.5f
     };
 
     GLuint VBO, VAO;
@@ -143,26 +109,13 @@ int main()
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        sizeof(vertices),
-        vertices,
-        GL_STATIC_DRAW
-    );
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Posicion.
     glVertexAttribPointer(
         0, 3, GL_FLOAT, GL_FALSE,
-        6 * sizeof(GLfloat), (GLvoid*)0
+        3 * sizeof(GLfloat), (GLvoid*)0
     );
     glEnableVertexAttribArray(0);
-
-    // Color.
-    glVertexAttribPointer(
-        1, 3, GL_FLOAT, GL_FALSE,
-        6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat))
-    );
-    glEnableVertexAttribArray(1);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -176,41 +129,34 @@ int main()
 
     GLint modelLoc = glGetUniformLocation(ourShader.Program, "model");
     GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
-    GLint projecLoc = glGetUniformLocation(
-        ourShader.Program, "projection"
-    );
+    GLint projecLoc = glGetUniformLocation(ourShader.Program, "projection");
+    GLint colorLoc = glGetUniformLocation(ourShader.Program, "objectColor");
 
     tiempoAnterior = glfwGetTime();
 
     while (!glfwWindowShouldClose(window))
     {
-        // Calcular el tiempo transcurrido entre fotogramas.
         double tiempoActual = glfwGetTime();
         deltaTime = static_cast<float>(tiempoActual - tiempoAnterior);
         tiempoAnterior = tiempoActual;
 
-        // Evitar saltos grandes si el programa se pausa.
         if (deltaTime > 0.05f)
             deltaTime = 0.05f;
 
         glfwPollEvents();
         Inputs(window);
 
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         ourShader.Use();
 
-        glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = glm::mat4(1.0f);
 
-        view = glm::translate(
-            view, glm::vec3(movX, movY, movZ)
-        );
+        view = glm::translate(view, glm::vec3(movX, movY, movZ));
 
         view = glm::rotate(
-            view,
-            glm::radians(rot),
+            view, glm::radians(rot),
             glm::vec3(0.0f, 1.0f, 0.0f)
         );
 
@@ -224,40 +170,77 @@ int main()
 
         glBindVertexArray(VAO);
 
-        // TABLERO
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(3.0f, 0.3f, 2.0f));
-        model = glm::translate(model, glm::vec3(0.0f, 0.6f, 0.0f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // Función reutilizable: dibuja un cubo con el modelo y color indicados.
+        auto dibujarCubo = [&](glm::mat4 modelo, glm::vec3 color)
+            {
+                glUniformMatrix4fv(
+                    modelLoc, 1, GL_FALSE, glm::value_ptr(modelo)
+                );
 
-        // PATA 1: derecha, adelante
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        model = glm::translate(model, glm::vec3(4.5f, -0.45f, 2.833333f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+                glUniform3fv(colorLoc, 1, glm::value_ptr(color));
 
-        // PATA 2: izquierda, adelante
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        model = glm::translate(model, glm::vec3(-4.5f, -0.45f, 2.833333f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            };
 
-        // PATA 3: izquierda, atras
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        model = glm::translate(model, glm::vec3(-4.5f, -0.45f, -2.833333f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // Cabeza: blanca.
+        glm::mat4 model = glm::mat4(1.0f);//una declaracion de model
+        model = glm::scale(model, glm::vec3(0.8f, 1.45f, 0.77f));
+        model = glm::translate(model, glm::vec3(0.0f, 0.28f, 0.0f));
+        dibujarCubo(model, glm::vec3(0.8706f, 0.8706f, 0.8706f));
 
-        // PATA 4: derecha, atras
+        // Ojo derecho
         model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
-        model = glm::translate(model, glm::vec3(4.5f, -0.45f, -2.833333f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        model = glm::scale(model, glm::vec3(0.225f, 0.25f, 0.1f));
+        model = glm::translate(model, glm::vec3(1.2f, 3.0f, 4.0f));
+        dibujarCubo(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+        // Ojo izquierdo
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(0.225f, 0.25f, 0.1f));
+        model = glm::translate(model, glm::vec3(-1.2f, 3.0f, 4.0f));
+        dibujarCubo(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+        // Pico arriba.
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(0.8f, 0.25f, 0.6f));
+        model = glm::translate(model, glm::vec3(0.0f, 2.0f, 1.0f));
+        dibujarCubo(model, glm::vec3(0.749f, 0.573f, 0.259f));
+
+        // Pico abajo.
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(0.8f, 0.25f, 0.6f));
+        model = glm::translate(model, glm::vec3(0.0f, 1.0f, 1.0f));
+        dibujarCubo(model, glm::vec3(0.573f, 0.447f, 0.192f));
+
+        // Papada.
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(0.4f, 0.65f, 0.3f));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.5f));
+        dibujarCubo(model, glm::vec3(1.0f, 0.0f, 0.0f));
+
+        // Cuerpo
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(1.0f, 1.45f, 1.77f));
+        model = glm::translate(model, glm::vec3(1.0f, 1.28f, 1.0f));
+        dibujarCubo(model, glm::vec3(0.8706f, 0.8706f, 0.8706f));
+
+        //// PATA 2: naranja.
+        //model = glm::mat4(1.0f);
+        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
+        //model = glm::translate(model, glm::vec3(-4.5f, -0.45f, 2.833333f));
+        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
+
+        //// PATA 3: naranja.
+        //model = glm::mat4(1.0f);
+        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
+        //model = glm::translate(model, glm::vec3(-4.5f, -0.45f, -2.833333f));
+        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
+
+        //// PATA 4: naranja.
+        //model = glm::mat4(1.0f);
+        //model = glm::scale(model, glm::vec3(0.3f, 0.6f, 0.3f));
+        //model = glm::translate(model, glm::vec3(4.5f, -0.45f, -2.833333f));
+        //dibujarCubo(model, glm::vec3(1.0f, 0.5f, 0.0f));
 
         glBindVertexArray(0);
 
@@ -275,9 +258,8 @@ int main()
 
 void Inputs(GLFWwindow* window)
 {
-    // Cambia estos valores para ajustar la velocidad.
-    const float velocidadMovimiento = 0.6f;  // Unidades por segundo.
-    const float velocidadRotacion = 20.0f;   // Grados por segundo.
+    const float velocidadMovimiento = 0.6f;
+    const float velocidadRotacion = 20.0f;
 
     float paso = velocidadMovimiento * deltaTime;
     float giro = velocidadRotacion * deltaTime;
@@ -285,39 +267,29 @@ void Inputs(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Movimiento horizontal.
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         movX += paso;
 
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         movX -= paso;
 
-    // Subir: Page Up o flecha arriba.
     if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS ||
         glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-    {
         movY += paso;
-    }
 
-    // Bajar: Page Down o flecha abajo.
     if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS ||
         glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-    {
         movY -= paso;
-    }
 
-    // Alejar.
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         movZ -= paso;
 
-    // Acercar.
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         movZ += paso;
 
-    // Rotar.
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
         rot += giro;
 
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
         rot -= giro;
-}
+}//pequena caratula, con numero de equipo NO NOMBRES COMPLETOS, presentacion de equipo: nombre integrantes, nombre equipo, numero de cuenta y correo de los integrantes,PALETA DE COLORES, TIPOGRAFIA
