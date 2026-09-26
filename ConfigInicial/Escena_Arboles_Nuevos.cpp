@@ -301,9 +301,9 @@ void CrearNubes(MallaPaisaje& malla)
                         std::cos(lat), std::sin(lat) * std::sin(lon));
                     return { b.centro + b.radio * n, n,
                         glm::vec3(1.0f, 1.0f, 1.0f), 0.0f };
-                    };
-                VerticePaisaje a = punto(fila, col), b1 = punto(fila + 1, col);
-                VerticePaisaje c = punto(fila, col + 1), d = punto(fila + 1, col + 1);
+                };
+                VerticePaisaje a=punto(fila,col), b1=punto(fila+1,col);
+                VerticePaisaje c=punto(fila,col+1), d=punto(fila+1,col+1);
                 vertices.push_back(a); vertices.push_back(b1); vertices.push_back(c);
                 vertices.push_back(c); vertices.push_back(b1); vertices.push_back(d);
             }
@@ -335,14 +335,14 @@ void CrearArbolDesdeOBJ(MallaPaisaje& malla, const char* ruta,
         else if (linea[0] == 'f' && linea[1] == ' ')
         {
             std::istringstream entrada(linea.substr(2));
-            int a, b, c;
+            int a,b,c;
             if (!(entrada >> a >> b >> c) || a < 1 || b < 1 || c < 1 ||
                 a > static_cast<int>(posiciones.size()) ||
                 b > static_cast<int>(posiciones.size()) ||
                 c > static_cast<int>(posiciones.size()))
                 throw std::runtime_error("Caras invalidas en el OBJ del arbol");
-            glm::vec3 puntos[] = { posiciones[a - 1], posiciones[b - 1], posiciones[c - 1] };
-            glm::vec3 cruz = glm::cross(puntos[1] - puntos[0], puntos[2] - puntos[0]);
+            glm::vec3 puntos[] = { posiciones[a-1], posiciones[b-1], posiciones[c-1] };
+            glm::vec3 cruz = glm::cross(puntos[1]-puntos[0], puntos[2]-puntos[0]);
             float longitud = glm::length(cruz);
             if (longitud < 0.000001f) continue;
             glm::vec3 normal = cruz / longitud;
@@ -353,10 +353,10 @@ void CrearArbolDesdeOBJ(MallaPaisaje& malla, const char* ruta,
                 float detalle = 0.5f + 0.5f * std::sin(p.x * 26.0f + p.z * 17.0f + p.y * 19.0f);
                 bool tronco = altura < 0.37f || (altura < 0.72f && distancia < 0.12f);
                 glm::vec3 color = tronco
-                    ? glm::mix(glm::vec3(0.32f, 0.15f, 0.065f), glm::vec3(0.72f, 0.40f, 0.18f), detalle)
-                    : glm::mix(glm::vec3(0.065f, 0.37f, 0.055f), glm::vec3(0.44f, 0.84f, 0.10f),
-                        glm::clamp(0.35f + 0.38f * detalle + 0.2f * normal.y, 0.0f, 1.0f));
-                vertices.push_back({ p,normal,color,0.0f });
+                    ? glm::mix(glm::vec3(0.32f,0.15f,0.065f), glm::vec3(0.72f,0.40f,0.18f), detalle)
+                    : glm::mix(glm::vec3(0.065f,0.37f,0.055f), glm::vec3(0.44f,0.84f,0.10f),
+                        glm::clamp(0.35f + 0.38f * detalle + 0.2f * normal.y,0.0f,1.0f));
+                vertices.push_back({p,normal,color,0.0f});
             }
         }
     }
@@ -640,12 +640,12 @@ int main()
         // Ajusta cada arbol por separado: (X, Y, Z), giro en grados, escala.
         float escalaBaseArbol = alturaPerro * 5.5f / (arbolMax.y - arbolMin.y);
         glm::vec3 arbolIzquierdoPosicion(centroX - 2.8f * unidad,
-            pisoY + 1.5f, centroZ - 14.2f * unidad);
+            pisoY + 1.8f, centroZ - 14.2f * unidad);
         glm::vec3 arbolIzquierdoRotacion(0.0f, 90.0f, 0.0f);
         glm::vec3 arbolIzquierdoEscala(escalaBaseArbol * 1.2);
 
         glm::vec3 arbolDerechoPosicion(centroX + 2.8f * unidad,
-            pisoY-0.3f, centroZ - 9.2f * unidad);
+            pisoY, centroZ - 9.2f * unidad);
         glm::vec3 arbolDerechoRotacion(0.0f, -35.0f, 0.0f);
         glm::vec3 arbolDerechoEscala(escalaBaseArbol * 1.50f);
 
