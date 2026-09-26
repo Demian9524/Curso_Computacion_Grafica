@@ -399,3 +399,16 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# =========================================================
+# MODELOS 3D DEL PROYECTO
+# Permitir archivos OBJ dentro de la carpeta Models
+# =========================================================
+
+!Models/
+!Models/**/*.obj
+!Models/**/*.mtl
+!Models/**/*.png
+!Models/**/*.jpg
+!Models/**/*.jpeg
+!Models/**/*.tga
