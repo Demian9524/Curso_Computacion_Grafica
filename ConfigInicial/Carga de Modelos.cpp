@@ -1,7 +1,7 @@
-// Previo practica #6 - Bello Zaragoza Demian
-// Posicion, rotacion y escala manual de modelos y paisaje. Pasto fijo.
-// Sustituye tu CPP principal por este. Conserva tus headers, shaders y Models.
-// WASD/flechas: moverse. Mouse: mirar. G: activar/desactivar pasto. Esc: salir.
+// Practica #6 
+// Bello Zaragoza Demian
+// Fecha de entrega: 26 de septiembre 2026
+// Número de cuenta: 320200928
 
 #include <iostream>
 #include <cstdlib>
@@ -44,6 +44,7 @@ const glm::vec3 COLINA_ESCALA(1.0f, 1.0f, 1.0f);
 const float COLINA_GIRO_Y = 0.0f; // Grados, gira su base ovalada.
 const float ALTURA_PASTO = 0.085f; // Altura base; algunas matas son mas largas.
 const int CANTIDAD_MATAS = 72000; // El doble del pasto original.
+const float CANTIDAD_NUBES_CIELO = 0.57f; // 0.0: cielo claro; 1.0: mas nuboso.
 glm::mat4 matrizPaisaje(1.0f); // El pasto acompana al piso.
 
 float unidad = 1.0f, pisoY = -1.0f;
@@ -52,9 +53,10 @@ glm::vec3 perroMin, perroMax;
 // Limites transformados: el hueco del pasto y la sombra siguen al modelo.
 glm::vec3 perroMundoMin, perroMundoMax, llamaMundoMin, llamaMundoMax;
 glm::vec3 cofreMundoMin, cofreMundoMax, municionMundoMin, municionMundoMax;
+glm::vec3 bigPotMundoMin, bigPotMundoMax;
 glm::vec3 arbustoAtrasMundoMin, arbustoAtrasMundoMax;
 glm::vec3 arbustoDelanteMundoMin, arbustoDelanteMundoMax;
-glm::vec3 rocaMundoMin[6], rocaMundoMax[6];
+glm::vec3 rocaMundoMin[13], rocaMundoMax[13];
 
 void KeyCallback(GLFWwindow*, int, int, int, int);
 void MouseCallback(GLFWwindow*, double, double);
@@ -277,41 +279,6 @@ void CrearTerreno(MallaPaisaje& malla)
     malla.Subir(vertices);
 }
 
-// Nubes estaticas de formas redondeadas: usan el shader del paisaje.
-void CrearNubes(MallaPaisaje& malla)
-{
-    std::vector<VerticePaisaje> vertices;
-    const float pi = 3.14159265f;
-    struct Bulto { glm::vec3 centro, radio; };
-    const Bulto bultos[] = {
-        { glm::vec3(-0.82f, 0.00f, 0.00f), glm::vec3(0.78f, 0.45f, 0.32f) },
-        { glm::vec3(-0.35f, 0.28f, 0.02f), glm::vec3(0.69f, 0.62f, 0.37f) },
-        { glm::vec3(0.35f, 0.23f, -0.02f), glm::vec3(0.85f, 0.65f, 0.40f) },
-        { glm::vec3(1.01f, 0.00f, 0.00f), glm::vec3(0.69f, 0.43f, 0.32f) }
-    };
-    for (const Bulto& b : bultos)
-    {
-        for (int fila = 0; fila < 9; ++fila)
-            for (int col = 0; col < 16; ++col)
-            {
-                auto punto = [&](int i, int j) -> VerticePaisaje {
-                    float lat = pi * i / 9.0f;
-                    float lon = 2.0f * pi * j / 16.0f;
-                    glm::vec3 n(std::sin(lat) * std::cos(lon),
-                        std::cos(lat), std::sin(lat) * std::sin(lon));
-                    return { b.centro + b.radio * n, n,
-                        glm::vec3(1.0f, 1.0f, 1.0f), 0.0f };
-                    };
-                VerticePaisaje a = punto(fila, col), b1 = punto(fila + 1, col);
-                VerticePaisaje c = punto(fila, col + 1), d = punto(fila + 1, col + 1);
-                vertices.push_back(a); vertices.push_back(b1); vertices.push_back(c);
-                vertices.push_back(c); vertices.push_back(b1); vertices.push_back(d);
-            }
-    }
-    malla.Subir(vertices);
-}
-
-// Dibuja el nuevo OBJ con colores de tronco y hojas. Su MTL no trae map_Kd.
 void CrearArbolDesdeOBJ(MallaPaisaje& malla, const char* ruta,
     const glm::vec3& minimo, const glm::vec3& maximo)
 {
@@ -335,32 +302,211 @@ void CrearArbolDesdeOBJ(MallaPaisaje& malla, const char* ruta,
         else if (linea[0] == 'f' && linea[1] == ' ')
         {
             std::istringstream entrada(linea.substr(2));
-            int a, b, c;
-            if (!(entrada >> a >> b >> c) || a < 1 || b < 1 || c < 1 ||
+
+            std::string tokenA, tokenB, tokenC;
+
+            if (!(entrada >> tokenA >> tokenB >> tokenC))
+                throw std::runtime_error("Cara incompleta en el OBJ del arbol");
+
+            auto obtenerIndiceVertice = [](const std::string& token) -> int
+                {
+                    // Admite:
+                    // 123
+                    // 123/45
+                    // 123//67
+                    // 123/45/67
+
+                    size_t barra = token.find('/');
+
+                    std::string numero =
+                        (barra == std::string::npos)
+                        ? token
+                        : token.substr(0, barra);
+
+                    if (numero.empty())
+                        throw std::runtime_error(
+                            "Indice de vertice invalido en OBJ");
+
+                    return std::stoi(numero);
+                };
+
+            int a = obtenerIndiceVertice(tokenA);
+            int b = obtenerIndiceVertice(tokenB);
+            int c = obtenerIndiceVertice(tokenC);
+
+            if (a < 1 || b < 1 || c < 1 ||
                 a > static_cast<int>(posiciones.size()) ||
                 b > static_cast<int>(posiciones.size()) ||
                 c > static_cast<int>(posiciones.size()))
-                throw std::runtime_error("Caras invalidas en el OBJ del arbol");
-            glm::vec3 puntos[] = { posiciones[a - 1], posiciones[b - 1], posiciones[c - 1] };
-            glm::vec3 cruz = glm::cross(puntos[1] - puntos[0], puntos[2] - puntos[0]);
+            {
+                throw std::runtime_error(
+                    "Indices fuera de rango en el OBJ del arbol");
+            }
+
+            glm::vec3 puntos[] =
+            {
+                posiciones[a - 1],
+                posiciones[b - 1],
+                posiciones[c - 1]
+            };
+
+            glm::vec3 cruz =
+                glm::cross(
+                    puntos[1] - puntos[0],
+                    puntos[2] - puntos[0]
+                );
+
             float longitud = glm::length(cruz);
-            if (longitud < 0.000001f) continue;
+
+            if (longitud < 0.000001f)
+                continue;
+
             glm::vec3 normal = cruz / longitud;
+
             for (const glm::vec3& p : puntos)
             {
-                float altura = (p.y - minimo.y) / alto;
-                float distancia = glm::length(glm::vec2(p.x, p.z) - centro) / radio;
-                float detalle = 0.5f + 0.5f * std::sin(p.x * 26.0f + p.z * 17.0f + p.y * 19.0f);
-                bool tronco = altura < 0.37f || (altura < 0.72f && distancia < 0.12f);
-                glm::vec3 color = tronco
-                    ? glm::mix(glm::vec3(0.32f, 0.15f, 0.065f), glm::vec3(0.72f, 0.40f, 0.18f), detalle)
-                    : glm::mix(glm::vec3(0.065f, 0.37f, 0.055f), glm::vec3(0.44f, 0.84f, 0.10f),
-                        glm::clamp(0.35f + 0.38f * detalle + 0.2f * normal.y, 0.0f, 1.0f));
-                vertices.push_back({ p,normal,color,0.0f });
+                float altura =
+                    (p.y - minimo.y) / alto;
+
+                float distancia =
+                    glm::length(
+                        glm::vec2(p.x, p.z) - centro
+                    ) / radio;
+
+                float detalle =
+                    0.5f +
+                    0.5f *
+                    std::sin(
+                        p.x * 26.0f +
+                        p.z * 17.0f +
+                        p.y * 19.0f
+                    );
+
+                bool tronco =
+                    altura < 0.37f ||
+                    (altura < 0.72f &&
+                        distancia < 0.12f);
+
+                glm::vec3 color;
+
+                if (tronco)
+                {
+                    color = glm::mix(
+                        glm::vec3(0.32f, 0.15f, 0.065f),
+                        glm::vec3(0.72f, 0.40f, 0.18f),
+                        detalle
+                    );
+                }
+                else
+                {
+                    color = glm::mix(
+                        glm::vec3(0.065f, 0.37f, 0.055f),
+                        glm::vec3(0.44f, 0.84f, 0.10f),
+                        glm::clamp(
+                            0.35f +
+                            0.38f * detalle +
+                            0.2f * normal.y,
+                            0.0f,
+                            1.0f
+                        )
+                    );
+                }
+
+                vertices.push_back(
+                    { p, normal, color, 0.0f }
+                );
             }
         }
     }
     if (vertices.empty()) throw std::runtime_error("El OBJ del arbol no tiene caras");
+    malla.Subir(vertices);
+}
+
+// Carga Roca1 sin textura y le aplica directamente el color gris del material LSG.
+// Admite caras OBJ en formato v, v/vt, v//vn y v/vt/vn.
+void CrearRocaColorDesdeOBJ(MallaPaisaje& malla, const char* ruta, const glm::vec3& color)
+{
+    std::ifstream archivo(ruta);
+    if (!archivo)
+        throw std::runtime_error(std::string("No se pudo abrir: ") + ruta);
+
+    std::vector<glm::vec3> posiciones;
+    std::vector<VerticePaisaje> vertices;
+    std::string linea;
+
+    auto obtenerIndiceVertice = [](const std::string& token) -> int
+        {
+            size_t barra = token.find('/');
+            std::string numero =
+                (barra == std::string::npos) ? token : token.substr(0, barra);
+
+            if (numero.empty())
+                throw std::runtime_error("Indice de vertice invalido en Roca1.obj");
+
+            return std::stoi(numero);
+        };
+
+    while (std::getline(archivo, linea))
+    {
+        if (linea.size() < 2)
+            continue;
+
+        if (linea[0] == 'v' && linea.size() > 2 && linea[1] == ' ')
+        {
+            std::istringstream entrada(linea.substr(2));
+            glm::vec3 p;
+            if (entrada >> p.x >> p.y >> p.z)
+                posiciones.push_back(p);
+        }
+        else if (linea[0] == 'f' && linea.size() > 2 && linea[1] == ' ')
+        {
+            std::istringstream entrada(linea.substr(2));
+            std::vector<std::string> tokens;
+            std::string token;
+
+            while (entrada >> token)
+                tokens.push_back(token);
+
+            if (tokens.size() < 3)
+                continue;
+
+            // Triangula cualquier cara tipo triangulo, quad o poligono con un fan.
+            for (size_t i = 1; i + 1 < tokens.size(); ++i)
+            {
+                int ia = obtenerIndiceVertice(tokens[0]);
+                int ib = obtenerIndiceVertice(tokens[i]);
+                int ic = obtenerIndiceVertice(tokens[i + 1]);
+
+                if (ia < 1 || ib < 1 || ic < 1 ||
+                    ia > static_cast<int>(posiciones.size()) ||
+                    ib > static_cast<int>(posiciones.size()) ||
+                    ic > static_cast<int>(posiciones.size()))
+                {
+                    throw std::runtime_error("Indices fuera de rango en Roca1.obj");
+                }
+
+                glm::vec3 p0 = posiciones[ia - 1];
+                glm::vec3 p1 = posiciones[ib - 1];
+                glm::vec3 p2 = posiciones[ic - 1];
+
+                glm::vec3 cruz = glm::cross(p1 - p0, p2 - p0);
+                float longitud = glm::length(cruz);
+
+                if (longitud < 0.000001f)
+                    continue;
+
+                glm::vec3 normal = cruz / longitud;
+
+                vertices.push_back({ p0, normal, color, 0.0f });
+                vertices.push_back({ p1, normal, color, 0.0f });
+                vertices.push_back({ p2, normal, color, 0.0f });
+            }
+        }
+    }
+
+    if (vertices.empty())
+        throw std::runtime_error("Roca1.obj no tiene caras validas");
+
     malla.Subir(vertices);
 }
 
@@ -396,11 +542,12 @@ void CrearPasto(MallaPaisaje& malla)
             BajoModelo(x, z, llamaMundoMin, llamaMundoMax) ||
             BajoModelo(x, z, cofreMundoMin, cofreMundoMax) ||
             BajoModelo(x, z, municionMundoMin, municionMundoMax) ||
+            BajoModelo(x, z, bigPotMundoMin, bigPotMundoMax) ||
             BajoModelo(x, z, arbustoAtrasMundoMin, arbustoAtrasMundoMax) ||
             BajoModelo(x, z, arbustoDelanteMundoMin, arbustoDelanteMundoMax)) continue;
 
         bool dentroRoca = false;
-        for (int r = 0; r < 6; ++r)
+        for (int r = 0; r < 13; ++r)
             if (BajoModelo(x, z, rocaMundoMin[r], rocaMundoMax[r]))
                 dentroRoca = true;
         if (dentroRoca) continue;
@@ -431,6 +578,103 @@ void CrearPasto(MallaPaisaje& malla)
         }
     }
     malla.Subir(vertices);
+}
+
+
+GLuint Compilar(GLenum tipo, const char* codigo);
+
+// -----------------------------------------------------------------------------
+// BRILLO SUAVE PARA BIGPOT
+// Disco semitransparente dorado sobre el suelo, similar al resplandor del cofre.
+// -----------------------------------------------------------------------------
+void CrearDiscoBrillo(MallaPaisaje& malla)
+{
+    std::vector<VerticePaisaje> vertices;
+    const int segmentos = 64;
+    const float pi = 3.14159265f;
+
+    glm::vec3 centro(0.0f, 0.0f, 0.0f);
+    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+    glm::vec3 color(1.0f, 0.56f, 0.08f);
+
+    for (int i = 0; i < segmentos; ++i)
+    {
+        float a0 = 2.0f * pi * i / segmentos;
+        float a1 = 2.0f * pi * (i + 1) / segmentos;
+
+        glm::vec3 p0(std::cos(a0), 0.0f, std::sin(a0));
+        glm::vec3 p1(std::cos(a1), 0.0f, std::sin(a1));
+
+        // flexion se reutiliza aqui como intensidad:
+        // 1 en el centro, 0 en el borde.
+        vertices.push_back({ centro, normal, color, 1.0f });
+        vertices.push_back({ p0, normal, color, 0.0f });
+        vertices.push_back({ p1, normal, color, 0.0f });
+    }
+
+    malla.Subir(vertices);
+}
+
+const char* brilloVS = R"GLSL(
+#version 330 core
+layout(location=0) in vec3 posicion;
+layout(location=2) in vec3 color;
+layout(location=3) in float intensidad;
+
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
+
+out vec3 vColor;
+out float vIntensidad;
+
+void main()
+{
+    vColor = color;
+    vIntensidad = intensidad;
+    gl_Position = projection * view * model * vec4(posicion, 1.0);
+}
+)GLSL";
+
+const char* brilloFS = R"GLSL(
+#version 330 core
+in vec3 vColor;
+in float vIntensidad;
+
+out vec4 fragColor;
+
+void main()
+{
+    float a = pow(clamp(vIntensidad, 0.0, 1.0), 1.7) * 0.46;
+    fragColor = vec4(vColor, a);
+}
+)GLSL";
+
+GLuint CrearProgramaBrillo()
+{
+    GLuint vs = Compilar(GL_VERTEX_SHADER, brilloVS);
+    GLuint fs = Compilar(GL_FRAGMENT_SHADER, brilloFS);
+
+    GLuint programa = glCreateProgram();
+    glAttachShader(programa, vs);
+    glAttachShader(programa, fs);
+    glLinkProgram(programa);
+
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+
+    GLint ok = GL_FALSE;
+    glGetProgramiv(programa, GL_LINK_STATUS, &ok);
+
+    if (!ok)
+    {
+        char log[4096] = {};
+        glGetProgramInfoLog(programa, sizeof(log), nullptr, log);
+        glDeleteProgram(programa);
+        throw std::runtime_error(std::string("Error enlace brillo: ") + log);
+    }
+
+    return programa;
 }
 
 // Shaders exclusivos del paisaje; no se modifican tus shaders del perro.
@@ -505,6 +749,121 @@ GLuint Compilar(GLenum tipo, const char* codigo)
     return shader;
 }
 
+// Fondo de pantalla: nube difusa calculada por pixel, sin malla ni textura.
+// El rayo de vision conserva la direccion de la nube al girar la camara.
+const char* cieloVS = R"GLSL(
+#version 330 core
+out vec2 ndc;
+void main()
+{
+    vec2 p;
+    if (gl_VertexID == 0) p = vec2(-1.0, -1.0);
+    else if (gl_VertexID == 1) p = vec2(3.0, -1.0);
+    else p = vec2(-1.0, 3.0);
+    ndc = p;
+    gl_Position = vec4(p, 0.0, 1.0);
+}
+)GLSL";
+
+const char* cieloFS = R"GLSL(
+#version 330 core
+in vec2 ndc;
+out vec4 fragColor;
+uniform mat4 inversaProyeccion;
+uniform mat3 orientacionCamara;
+uniform float cantidadNubes;
+
+float hash2(vec2 p)
+{
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float ruido(vec2 p)
+{
+    vec2 celda = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash2(celda);
+    float b = hash2(celda + vec2(1.0, 0.0));
+    float c = hash2(celda + vec2(0.0, 1.0));
+    float d = hash2(celda + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float detalle(vec2 p)
+{
+    float suma = 0.0;
+    float peso = 0.5;
+    for (int i = 0; i < 4; ++i)
+    {
+        suma += peso * ruido(p);
+        p = p * 2.02 + vec2(11.7, 7.3);
+        peso *= 0.5;
+    }
+    return suma / 0.9375;
+}
+
+void main()
+{
+    vec4 ojo = inversaProyeccion * vec4(ndc, 1.0, 1.0);
+    vec3 dir = normalize(orientacionCamara * (ojo.xyz / ojo.w));
+    float altura = asin(clamp(dir.y, -1.0, 1.0));
+    float longitud = atan(dir.x, -dir.z);
+
+    // Azul mas claro cerca del horizonte, azul vivo en la parte alta.
+    float t = smoothstep(-0.13, 1.04, altura);
+    vec3 cielo = mix(vec3(0.68, 0.89, 1.00),
+                    vec3(0.17, 0.54, 0.88), t);
+    cielo += vec3(0.015, 0.025, 0.025) * (1.0 - t);
+
+    // Dos escalas y deformacion lenta: masas amplias con bordes vaporosos.
+    // No depende del tiempo; las nubes no se mueven.
+    vec2 p = vec2(longitud * 4.2, altura * 7.4);
+    vec2 deformacion = vec2(detalle(p * 0.43 + vec2(4.1, 7.2)),
+                            detalle(p * 0.43 + vec2(18.5, 1.6)));
+    vec2 q = p + (deformacion - 0.5) * 1.65;
+    float masa = detalle(q * vec2(1.05, 0.68));
+    float borde = ruido(q * vec2(3.6, 1.9) + vec2(3.4, 8.6));
+    float densidad = masa * 0.82 + borde * 0.18;
+    float nubes = smoothstep(0.47, 0.69,
+        densidad + (cantidadNubes - 0.55) * 0.16);
+
+    // Nubes mas suaves en el horizonte y zonas limpias de cielo arriba.
+    float velo = smoothstep(0.47, 0.71,
+        detalle(q * vec2(0.62, 0.42) + vec2(10.0, 2.0))) * 0.28;
+    float mezcla = clamp(max(nubes * 0.85, velo), 0.0, 0.88);
+    mezcla *= smoothstep(-0.18, 0.04, altura);
+
+    // Blanco calido donde da la luz y cian suave en la parte inferior.
+    float luz = clamp(0.68 + 0.28 * borde + altura * 0.10, 0.0, 1.0);
+    vec3 colorNube = mix(vec3(0.68, 0.86, 0.94),
+                         vec3(1.0, 0.99, 0.97), luz);
+    fragColor = vec4(mix(cielo, colorNube, mezcla), 1.0);
+}
+)GLSL";
+
+GLuint CrearProgramaCielo()
+{
+    GLuint vs = Compilar(GL_VERTEX_SHADER, cieloVS);
+    GLuint fs = Compilar(GL_FRAGMENT_SHADER, cieloFS);
+    GLuint programa = glCreateProgram();
+    glAttachShader(programa, vs);
+    glAttachShader(programa, fs);
+    glLinkProgram(programa);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    GLint ok = GL_FALSE;
+    glGetProgramiv(programa, GL_LINK_STATUS, &ok);
+    if (!ok)
+    {
+        char log[4096] = {};
+        glGetProgramInfoLog(programa, sizeof(log), nullptr, log);
+        glDeleteProgram(programa);
+        throw std::runtime_error(std::string("Error enlace cielo: ") + log);
+    }
+    return programa;
+}
+
 GLuint CrearProgramaPaisaje()
 {
     GLuint vs = Compilar(GL_VERTEX_SHADER, paisajeVS);
@@ -539,7 +898,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_SAMPLES, 4);
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Escena con posiciones manuales - Demian", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica #6 Bello Zaragoza Demian", nullptr, nullptr);
     if (!window) { glfwTerminate(); return EXIT_FAILURE; }
     glfwMakeContextCurrent(window);
     glewExperimental = GL_TRUE;
@@ -567,8 +926,14 @@ int main()
         MedirOBJ("Models/Chest/coffre_autosave_1.obj", cofreMin, cofreMax);
         Model cofre((char*)"Models/Chest/coffre_autosave_1.obj");
 
+        // BIGPOT: modelo nuevo con su MTL y textura Image_BIGPOT.jpg.
+        glm::vec3 bigPotMin, bigPotMax;
+        MedirOBJ("Models/BigPot/Bigpot.obj", bigPotMin, bigPotMax);
+        Model bigPot((char*)"Models/BigPot/Bigpot.obj");
+
         float alturaPerro = perroMax.y - perroMin.y;
         float alturaCofre = cofreMax.y - cofreMin.y;
+        float alturaBigPot = bigPotMax.y - bigPotMin.y;
 
         // CAJA DE MUNICIONES
         glm::vec3 municionMin, municionMax;
@@ -579,24 +944,27 @@ int main()
         );
         Model municion((char*)"Models/Ammo/ammo_box_-_fortnite.obj");
 
-        // Reemplazo: mismo OBJ optimizado del nuevo arbol para ambas posiciones.
-        // El original no incluia imagen de textura; se colorea al cargarlo.
+        // ARBOL TEXTURIZADO.
+        // Ahora EmeraldTree.mtl referencia Image_0.jpg, asi que se carga con Model
+        // para respetar las UV y la textura exportada desde Blender.
         glm::vec3 arbolMin, arbolMax;
         MedirOBJ("Models/EmeraldTree/EmeraldTree.obj", arbolMin, arbolMax);
+        Model arbol((char*)"Models/EmeraldTree/EmeraldTree.obj");
 
         // Ambos arbustos usan el mismo OBJ y conservan posiciones independientes.
         glm::vec3 arbustoMin, arbustoMax;
         MedirOBJ("Models/Bush/Fortnite_Bush.obj", arbustoMin, arbustoMax);
         Model arbusto((char*)"Models/Bush/Fortnite_Bush.obj");
 
-        // Tres siluetas distintas extraidas del FBX original.
-        glm::vec3 rocaMin[3], rocaMax[3];
-        Model roca1((char*)"Models/Rocks/Roca1.obj");
-        Model roca2((char*)"Models/Rocks/Roca2.obj");
-        Model roca3((char*)"Models/Rocks/Roca3.obj");
+        // Cuatro tipos de roca nuevos.
+        // Roca1 no tiene textura; las cuatro se dibujan con el shader de color
+        // para que no dependan de map_Kd ni salgan negras.
+        glm::vec3 rocaMin[4], rocaMax[4];
+
         MedirOBJ("Models/Rocks/Roca1.obj", rocaMin[0], rocaMax[0]);
-        MedirOBJ("Models/Rocks/Roca2.obj", rocaMin[1], rocaMax[1]);
-        MedirOBJ("Models/Rocks/Roca3.obj", rocaMin[2], rocaMax[2]);
+        MedirOBJ("Models/Rocks/roca2 - copia.obj", rocaMin[1], rocaMax[1]);
+        MedirOBJ("Models/Rocks/roca3 - copia.obj", rocaMin[2], rocaMax[2]);
+        MedirOBJ("Models/Rocks/roca4 - copia.obj", rocaMin[3], rocaMax[3]);
 
         // =============================================================
         // ACOMODA TODOS LOS ELEMENTOS AQUI
@@ -623,9 +991,23 @@ int main()
         // ---------------- COFRE ------------------
         glm::vec3 cofrePosicion(centroX + 1.1f, pisoY, centroZ - 0.950f * unidad);
         glm::vec3 cofreRotacion(0.0f, -45.0f, 0.0f);
-        glm::vec3 cofreEscala(alturaPerro * 0.70f / alturaCofre);
+        glm::vec3 cofreEscala(alturaPerro * 0.75f / alturaCofre);
         // Para subirlo: cambia SOLO el segundo valor de cofrePosicion.
         // Para girarlo: cambia cofreRotacion, por ejemplo (0, 45, 0).
+
+        // ---------------- BIGPOT -----------------
+        // Se coloca delante del cofre (hacia la camara = Z mas positivo).
+        // Cambia estos tres bloques si quieres moverlo, girarlo o escalarlo.
+        glm::vec3 bigPotPosicion(
+            cofrePosicion.x - 0.15f * unidad,
+            pisoY,
+            cofrePosicion.z + 0.95f * unidad
+        );
+        glm::vec3 bigPotRotacion(0.0f, -25.0f, 0.0f);
+
+        // Un poco menor que el cofre para que no lo tape por completo.
+        float escalaBaseBigPot = (0.21f, 0.21f, 0.21f);
+        glm::vec3 bigPotEscala(escalaBaseBigPot);
 
         // ---------------- CAJA DE MUNICIONES ----
         // Coordenadas editables e independientes: X derecha, Y altura, Z fondo.
@@ -634,81 +1016,163 @@ int main()
             pisoY, cofrePosicion.z + 0.15f * unidad);
         glm::vec3 municionRotacion(0.0f, 0.0f, 0.0f);
         glm::vec3 municionEscala(
-            (alturaCofre * cofreEscala.y * 0.75f) / (municionMax.y - municionMin.y));
+            (alturaCofre * cofreEscala.y * 0.7f) / (municionMax.y - municionMin.y));
 
         // ---------------- ARBOLES ----------------
         // Ajusta cada arbol por separado: (X, Y, Z), giro en grados, escala.
         float escalaBaseArbol = alturaPerro * 5.5f / (arbolMax.y - arbolMin.y);
         glm::vec3 arbolIzquierdoPosicion(centroX - 2.8f * unidad,
-            pisoY + 1.5f, centroZ - 14.2f * unidad);
+            pisoY + 1.8f, centroZ - 14.75f * unidad);
         glm::vec3 arbolIzquierdoRotacion(0.0f, 90.0f, 0.0f);
         glm::vec3 arbolIzquierdoEscala(escalaBaseArbol * 1.2);
 
         glm::vec3 arbolDerechoPosicion(centroX + 2.8f * unidad,
-            pisoY-0.3f, centroZ - 9.2f * unidad);
+            pisoY + 0.1f, centroZ - 9.5f * unidad);
         glm::vec3 arbolDerechoRotacion(0.0f, -35.0f, 0.0f);
         glm::vec3 arbolDerechoEscala(escalaBaseArbol * 1.50f);
+
+        // Dos arboles adicionales al fondo para llenar mejor el horizonte.
+        glm::vec3 arbolFondoIzqPosicion(
+            centroX + 1.3f * unidad,
+            pisoY +1.8f,
+            centroZ - 16.6f * unidad
+        );
+        glm::vec3 arbolFondoIzqRotacion(0.0f, 28.0f, 0.0f);
+        glm::vec3 arbolFondoIzqEscala(escalaBaseArbol * 0.95f);
+
+        glm::vec3 arbolFondoDerPosicion(
+            centroX + 6.6f * unidad,
+            pisoY + 0.50f,
+            centroZ - 17.2f * unidad
+        );
+        glm::vec3 arbolFondoDerRotacion(0.0f, -70.0f, 0.0f);
+        glm::vec3 arbolFondoDerEscala(escalaBaseArbol * 1.05f);
 
         // ---------------- ARBUSTOS ---------------
         // Centro atras del perro; el otro delante, a su izquierda.
         // Cambia X, Y y Z de cada uno libremente, igual que los demas modelos.
-        float escalaBaseArbusto = alturaPerro * 2.0f / (arbustoMax.y - arbustoMin.y);
+        float escalaBaseArbusto = alturaPerro * 2.5f / (arbustoMax.y - arbustoMin.y);
         glm::vec3 arbustoAtrasPosicion(centroX, pisoY,
             centroZ - 5.0f * unidad);
         glm::vec3 arbustoAtrasRotacion(0.0f, 25.0f, 0.0f);
         glm::vec3 arbustoAtrasEscala(escalaBaseArbusto * 0.60f);
 
-        glm::vec3 arbustoDelantePosicion(centroX - 1.7f * unidad, pisoY,
+        glm::vec3 arbustoDelantePosicion(centroX - 1.8f * unidad, pisoY,
             centroZ + 0.5f * unidad);
         glm::vec3 arbustoDelanteRotacion(0.0f, -30.0f, 0.0f);
         glm::vec3 arbustoDelanteEscala(escalaBaseArbusto * 0.45f);
 
         // ---------------- ROCAS -----------------
-        // Cambia cada posicion, giro o tamano sin afectar a las demas.
-        // Base del OBJ en Y=0; escala expresada como altura deseada / altura OBJ.
-        const int TIPO_ROCA[6] = { 0, 1, 2, 1, 0, 2 };
-        glm::vec3 rocaPosicion[6] = {
-            glm::vec3(centroX - 4.6f * unidad,
-                AlturaTerreno(centroX - 4.6f * unidad, centroZ - 5.2f * unidad + 4.5f) - 0.05f * unidad,
-                centroZ - 5.2f * unidad),
-            glm::vec3(centroX + 4.2f * unidad,
-                AlturaTerreno(centroX + 4.2f * unidad, centroZ - 6.1f * unidad + 4.5f) - 0.05f * unidad,
-                centroZ - 6.1f * unidad),
-            glm::vec3(centroX + 0.4f * unidad,
-                AlturaTerreno(centroX + 0.4f * unidad, centroZ - 8.3f * unidad + 4.5f) - 0.05f * unidad,
-                centroZ - 8.3f * unidad),
-            glm::vec3(centroX - 3.3f * unidad, pisoY - 0.09f * unidad, centroZ + 1.5f * unidad),
-            glm::vec3(centroX + 3.5f * unidad, pisoY - 0.08f * unidad, centroZ + 1.9f * unidad),
-            glm::vec3(centroX + 0.25f * unidad, pisoY - 0.10f * unidad, centroZ + 4.1f * unidad)
+        // 12 rocas distribuidas por el entorno usando 4 modelos diferentes.
+        // Puedes mover cualquiera cambiando su glm::vec3 de posicion.
+        const int CANTIDAD_ROCAS = 13;
+        const int TIPO_ROCA[CANTIDAD_ROCAS] = {
+            0, 1, 2, 3,
+            1, 3, 0, 2,
+            3, 0, 2, 1,
+            0
         };
-        glm::vec3 rocaRotacion[6] = {
-            glm::vec3(0, 27, 5), glm::vec3(0, 107, -6),
-            glm::vec3(0, -40, 3), glm::vec3(0, 151, -10),
-            glm::vec3(0, -74, 7), glm::vec3(0, 61, -11)
-        };
-        float alturasRoca[6] = { 0.53f, 0.64f, 0.36f, 0.83f, 0.75f, 0.49f };
-        glm::vec3 rocaEscala[6];
-        for (int i = 0; i < 6; ++i)
-        {
-            float escala = alturaPerro * alturasRoca[i] /
-                (rocaMax[TIPO_ROCA[i]].y - rocaMin[TIPO_ROCA[i]].y);
-            rocaEscala[i] = glm::vec3(escala * (i % 2 ? 1.13f : 1.0f),
-                escala * (i % 3 ? 0.82f : 1.0f), escala * (i % 2 ? 0.84f : 1.08f));
-        }
 
-        // ---------------- NUBES -----------------
-        // X/Y/Z absolutas y tamano independientes. Z negativo las deja al fondo.
-        glm::vec3 nubePosicion[3] = {
-            glm::vec3(centroX - 7.0f * unidad, pisoY + 7.0f * unidad, centroZ - 20.0f * unidad),
-            glm::vec3(centroX + 1.1f * unidad, pisoY + 8.1f * unidad, centroZ - 23.0f * unidad),
-            glm::vec3(centroX + 8.0f * unidad, pisoY + 6.5f * unidad, centroZ - 19.0f * unidad)
+        glm::vec3 rocaPosicion[CANTIDAD_ROCAS] = {
+            // Fondo / colina
+            glm::vec3(centroX - 5.8f * unidad,
+                AlturaTerreno(centroX - 5.8f * unidad, centroZ - 8.2f * unidad + 4.5f) - 0.05f * unidad,
+                centroZ - 8.2f * unidad),
+
+            glm::vec3(centroX + 5.2f * unidad,
+                AlturaTerreno(centroX + 5.2f * unidad, centroZ - 9.0f * unidad + 4.5f) - 0.05f * unidad,
+                centroZ - 9.0f * unidad),
+
+            glm::vec3(centroX - 2.2f * unidad,
+                AlturaTerreno(centroX - 2.2f * unidad, centroZ - 11.4f * unidad + 4.5f) - 0.05f * unidad,
+                centroZ - 11.4f * unidad),
+
+            glm::vec3(centroX + 2.9f * unidad,
+                AlturaTerreno(centroX + 2.9f * unidad, centroZ - 12.6f * unidad + 4.5f) - 0.05f * unidad,
+                centroZ - 12.6f * unidad),
+
+                // Zona media
+                glm::vec3(centroX - 4.3f * unidad,
+                    AlturaTerreno(centroX - 4.3f * unidad, centroZ - 4.8f * unidad + 4.5f) - 0.04f * unidad,
+                    centroZ - 4.8f * unidad),
+
+                glm::vec3(centroX + 4.6f * unidad,
+                    AlturaTerreno(centroX + 4.6f * unidad, centroZ - 5.7f * unidad + 4.5f) - 0.04f * unidad,
+                    centroZ - 5.7f * unidad),
+
+                glm::vec3(centroX + 0.9f * unidad,
+                    AlturaTerreno(centroX + 0.9f * unidad, centroZ - 7.0f * unidad + 4.5f) - 0.04f * unidad,
+                    centroZ - 7.0f * unidad),
+
+                glm::vec3(centroX - 1.3f * unidad,
+                    AlturaTerreno(centroX - 1.3f * unidad, centroZ - 3.2f * unidad + 4.5f) - 0.04f * unidad,
+                    centroZ - 3.2f * unidad),
+
+                    // Primer plano / lados
+                    glm::vec3(centroX - 4.8f * unidad, pisoY - 0.08f * unidad,
+                        centroZ + 1.2f * unidad),
+
+                    glm::vec3(centroX + 4.5f * unidad, pisoY - 0.08f * unidad,
+                        centroZ + 1.8f * unidad),
+
+                    glm::vec3(centroX - 2.6f * unidad, pisoY - 0.07f * unidad,
+                        centroZ + 4.0f * unidad),
+
+                    glm::vec3(centroX + 2.4f * unidad, pisoY - 0.07f * unidad,
+                        centroZ + 4.7f * unidad),
+
+                        // Piedra nueva justo delante del perrito.
+                        glm::vec3(
+                            perroPosicion.x - 0.85f * unidad,
+                            pisoY - 0.15f * unidad,
+                            perroPosicion.z + 1.15f * unidad
+                        )
         };
-        glm::vec3 nubeRotacion[3] = { glm::vec3(0,0,0), glm::vec3(0,14,0), glm::vec3(0,-17,0) };
-        glm::vec3 nubeEscala[3] = {
-            glm::vec3(unidad * 0.90f, unidad * 0.88f, unidad),
-            glm::vec3(unidad * 1.20f, unidad * 1.10f, unidad),
-            glm::vec3(unidad * 0.78f, unidad * 0.85f, unidad)
+
+        glm::vec3 rocaRotacion[CANTIDAD_ROCAS] = {
+            glm::vec3(0,  18,   4),
+            glm::vec3(0,  72,  -5),
+            glm::vec3(0, -38,   3),
+            glm::vec3(0, 138,  -7),
+            glm::vec3(0, 105,   5),
+            glm::vec3(0, -62,  -4),
+            glm::vec3(0,  34,   2),
+            glm::vec3(0, 164,  -6),
+            glm::vec3(0, -84,   8),
+            glm::vec3(0,  51,  -9),
+            glm::vec3(0, 121,   5),
+            glm::vec3(0, -21,  -4),
+            glm::vec3(0,  42,   2)
         };
+
+        // Altura aproximada de cada roca respecto al perro.
+        float alturasRoca[CANTIDAD_ROCAS] = {
+            0.90f, 0.48f, 0.66f, 0.55f,
+            0.34f, 0.72f, 0.30f, 0.38f,
+            1.05f, 0.82f, 0.43f, 0.60f,
+            0.52f
+        };
+
+        glm::vec3 rocaEscala[CANTIDAD_ROCAS];
+
+        for (int i = 0; i < CANTIDAD_ROCAS; ++i)
+        {
+            int tipo = TIPO_ROCA[i];
+
+            float escala = alturaPerro * alturasRoca[i] /
+                (rocaMax[tipo].y - rocaMin[tipo].y);
+
+            // Pequeñas variaciones para que incluso el mismo modelo parezca distinto.
+            float anchoX = (i % 3 == 0) ? 1.18f : ((i % 3 == 1) ? 0.92f : 1.05f);
+            float altoY = (i % 4 == 0) ? 0.88f : 1.0f;
+            float fondoZ = (i % 2 == 0) ? 1.08f : 0.90f;
+
+            rocaEscala[i] = glm::vec3(
+                escala * anchoX,
+                escala * altoY,
+                escala * fondoZ
+            );
+        }
 
         // ---------------- PISO Y PASTO -----------
         // Se transforman juntos porque el pasto nace de la misma superficie.
@@ -729,9 +1193,41 @@ int main()
         glm::vec3 pivoteLlama(0.0f, 0.000625f, -0.0535435f);
         glm::vec3 pivoteCofre((cofreMin.x + cofreMax.x) * 0.5f, cofreMin.y,
             (cofreMin.z + cofreMax.z) * 0.5f);
+
+        glm::vec3 pivoteBigPot(
+            (bigPotMin.x + bigPotMax.x) * 0.5f,
+            bigPotMin.y,
+            (bigPotMin.z + bigPotMax.z) * 0.5f
+        );
+
         glm::mat4 modelDog = TransformarModelo(perroPosicion, perroRotacion, perroEscala, pivotePerro);
         glm::mat4 modelLlama = TransformarModelo(llamaPosicion, llamaRotacion, llamaEscala, pivoteLlama);
         glm::mat4 modelCofre = TransformarModelo(cofrePosicion, cofreRotacion, cofreEscala, pivoteCofre);
+        glm::mat4 modelBigPot = TransformarModelo(
+            bigPotPosicion, bigPotRotacion, bigPotEscala, pivoteBigPot);
+
+        // Disco dorado apenas por encima del piso del BigPot.
+        glm::mat4 modelBrilloBigPot(1.0f);
+        modelBrilloBigPot = glm::translate(
+            modelBrilloBigPot,
+            glm::vec3(bigPotPosicion.x, bigPotPosicion.y + 0.012f * unidad, bigPotPosicion.z)
+        );
+        modelBrilloBigPot = glm::scale(
+            modelBrilloBigPot,
+            glm::vec3(unidad * 0.72f, 1.0f, unidad * 0.55f)
+        );
+
+        // Resplandor dorado del cofre: más amplio e intenso, como en Fortnite.
+        glm::mat4 modelBrilloCofre(1.0f);
+        modelBrilloCofre = glm::translate(
+            modelBrilloCofre,
+            glm::vec3(cofrePosicion.x, cofrePosicion.y + 0.014f * unidad, cofrePosicion.z)
+        );
+        modelBrilloCofre = glm::scale(
+            modelBrilloCofre,
+            glm::vec3(unidad * 1.10f, 1.0f, unidad * 0.82f)
+        );
+
         glm::vec3 pivoteMunicion((municionMin.x + municionMax.x) * 0.5f,
             municionMin.y, (municionMin.z + municionMax.z) * 0.5f);
         glm::mat4 modelMunicion = TransformarModelo(
@@ -742,27 +1238,29 @@ int main()
             arbolIzquierdoPosicion, arbolIzquierdoRotacion, arbolIzquierdoEscala, pivoteArbol);
         glm::mat4 modelArbolDerecho = TransformarModelo(
             arbolDerechoPosicion, arbolDerechoRotacion, arbolDerechoEscala, pivoteArbol);
+        glm::mat4 modelArbolFondoIzq = TransformarModelo(
+            arbolFondoIzqPosicion, arbolFondoIzqRotacion, arbolFondoIzqEscala, pivoteArbol);
+        glm::mat4 modelArbolFondoDer = TransformarModelo(
+            arbolFondoDerPosicion, arbolFondoDerRotacion, arbolFondoDerEscala, pivoteArbol);
+
         glm::vec3 pivoteArbusto((arbustoMin.x + arbustoMax.x) * 0.5f,
             arbustoMin.y, (arbustoMin.z + arbustoMax.z) * 0.5f);
         glm::mat4 modelArbustoAtras = TransformarModelo(
             arbustoAtrasPosicion, arbustoAtrasRotacion, arbustoAtrasEscala, pivoteArbusto);
         glm::mat4 modelArbustoDelante = TransformarModelo(
             arbustoDelantePosicion, arbustoDelanteRotacion, arbustoDelanteEscala, pivoteArbusto);
-        glm::mat4 modelRoca[6], modelNube[3];
-        for (int i = 0; i < 6; ++i)
+        glm::mat4 modelRoca[CANTIDAD_ROCAS];
+        for (int i = 0; i < CANTIDAD_ROCAS; ++i)
         {
             int tipo = TIPO_ROCA[i];
             glm::vec3 pivote((rocaMin[tipo].x + rocaMax[tipo].x) * 0.5f,
                 rocaMin[tipo].y, (rocaMin[tipo].z + rocaMax[tipo].z) * 0.5f);
             modelRoca[i] = TransformarModelo(rocaPosicion[i], rocaRotacion[i], rocaEscala[i], pivote);
         }
-        for (int i = 0; i < 3; ++i)
-            modelNube[i] = TransformarModelo(nubePosicion[i], nubeRotacion[i],
-                nubeEscala[i], glm::vec3(0.0f));
         matrizPaisaje = TransformarModelo(pisoPosicion, pisoRotacion, pisoEscala,
             glm::vec3(centroX, pisoY, centroZ));
 
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < CANTIDAD_ROCAS; ++i)
             LimitesTransformados(modelRoca[i], rocaMin[TIPO_ROCA[i]], rocaMax[TIPO_ROCA[i]],
                 rocaMundoMin[i], rocaMundoMax[i]);
         LimitesTransformados(modelDog, perroMin, perroMax, perroMundoMin, perroMundoMax);
@@ -770,6 +1268,7 @@ int main()
             glm::vec3(-0.211756f, 0.000625f, -0.480119f),
             glm::vec3(0.211756f, 1.207423f, 0.373032f), llamaMundoMin, llamaMundoMax);
         LimitesTransformados(modelCofre, cofreMin, cofreMax, cofreMundoMin, cofreMundoMax);
+        LimitesTransformados(modelBigPot, bigPotMin, bigPotMax, bigPotMundoMin, bigPotMundoMax);
         LimitesTransformados(modelMunicion, municionMin, municionMax,
             municionMundoMin, municionMundoMax);
         LimitesTransformados(modelArbustoAtras, arbustoMin, arbustoMax,
@@ -779,11 +1278,43 @@ int main()
         glm::vec3 centroSombra = (perroMundoMin + perroMundoMax) * 0.5f;
 
         GLuint paisaje = CrearProgramaPaisaje();
-        MallaPaisaje terreno, pasto, nubes, arbolMalla;
+        GLuint brillo = CrearProgramaBrillo();
+        GLuint cielo = CrearProgramaCielo();
+        GLuint pantallaVAO = 0;
+        glGenVertexArrays(1, &pantallaVAO);
+
+        MallaPaisaje terreno, pasto, brilloBigPot;
+        MallaPaisaje rocaMalla[4];
+
         CrearTerreno(terreno);
         CrearPasto(pasto);
-        CrearNubes(nubes);
-        CrearArbolDesdeOBJ(arbolMalla, "Models/EmeraldTree/EmeraldTree.obj", arbolMin, arbolMax);
+        CrearDiscoBrillo(brilloBigPot);
+
+        // Cargar los cuatro modelos nuevos con colores ligeramente distintos.
+        // Esto evita que salgan negros aunque sus MTL no tengan textura map_Kd.
+        CrearRocaColorDesdeOBJ(
+            rocaMalla[0],
+            "Models/Rocks/Roca1.obj",
+            glm::vec3(0.68f, 0.70f, 0.72f)
+        );
+
+        CrearRocaColorDesdeOBJ(
+            rocaMalla[1],
+            "Models/Rocks/roca2 - copia.obj",
+            glm::vec3(0.58f, 0.61f, 0.64f)
+        );
+
+        CrearRocaColorDesdeOBJ(
+            rocaMalla[2],
+            "Models/Rocks/roca3 - copia.obj",
+            glm::vec3(0.72f, 0.70f, 0.66f)
+        );
+
+        CrearRocaColorDesdeOBJ(
+            rocaMalla[3],
+            "Models/Rocks/roca4 - copia.obj",
+            glm::vec3(0.55f, 0.59f, 0.62f)
+        );
         // Encuadre inicial: ve al perro de frente y las colinas detras de el.
         camera = Camera(camaraPosicion);
         lastFrame = static_cast<float>(glfwGetTime());
@@ -796,13 +1327,27 @@ int main()
             lastFrame = tiempo;
             glfwPollEvents();
             DoMovement();
-            glClearColor(0.40f, 0.73f, 0.98f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             // Perspectiva en radianes; no depende de las unidades de GetZoom().
             glm::mat4 projection = glm::perspective(glm::radians(45.0f),
                 static_cast<float>(SCREEN_WIDTH) / SCREEN_HEIGHT,
                 unidad * 0.015f, unidad * 80.0f);
             glm::mat4 view = camera.GetViewMatrix();
+
+            // Primero el cielo, luego el suelo y los modelos frente a el.
+            glDisable(GL_DEPTH_TEST);
+            glDepthMask(GL_FALSE);
+            glUseProgram(cielo);
+            Matriz(cielo, "inversaProyeccion", glm::inverse(projection));
+            glm::mat3 orientacionCielo(glm::inverse(view));
+            glUniformMatrix3fv(glGetUniformLocation(cielo, "orientacionCamara"),
+                1, GL_FALSE, glm::value_ptr(orientacionCielo));
+            glUniform1f(glGetUniformLocation(cielo, "cantidadNubes"), CANTIDAD_NUBES_CIELO);
+            glBindVertexArray(pantallaVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+            glDepthMask(GL_TRUE);
+            glEnable(GL_DEPTH_TEST);
 
             glUseProgram(paisaje);
             Matriz(paisaje, "projection", projection);
@@ -821,38 +1366,46 @@ int main()
                 pasto.Dibujar();
             }
 
-            // Nubes 3D fijas; el arbol y la colina las tapan con el depth test.
-            glUniform1i(glGetUniformLocation(paisaje, "esPasto"), 1);
-            for (int i = 0; i < 3; ++i)
-            {
-                Matriz(paisaje, "model", modelNube[i]);
-                nubes.Dibujar();
-            }
-
-            // Dos instancias del arbol nuevo, cada una con posicion/rotacion/escala propias.
-            glUniform1i(glGetUniformLocation(paisaje, "esPasto"), 1);
-            Matriz(paisaje, "model", modelArbolIzquierdo);
-            arbolMalla.Dibujar();
-            Matriz(paisaje, "model", modelArbolDerecho);
-            arbolMalla.Dibujar();
-
+            // Cambiar al shader de modelos texturizados.
             shaderPerro.Use();
             Matriz(shaderPerro.Program, "projection", projection);
             Matriz(shaderPerro.Program, "view", view);
+
+            // Cuatro instancias del arbol usando la textura real de EmeraldTree.mtl.
+            Matriz(shaderPerro.Program, "model", modelArbolIzquierdo);
+            arbol.Draw(shaderPerro);
+
+            Matriz(shaderPerro.Program, "model", modelArbolDerecho);
+            arbol.Draw(shaderPerro);
+
+            Matriz(shaderPerro.Program, "model", modelArbolFondoIzq);
+            arbol.Draw(shaderPerro);
+
+            Matriz(shaderPerro.Program, "model", modelArbolFondoDer);
+            arbol.Draw(shaderPerro);
             // Dos instancias del arbusto, con transformaciones independientes.
             Matriz(shaderPerro.Program, "model", modelArbustoAtras);
             arbusto.Draw(shaderPerro);
             Matriz(shaderPerro.Program, "model", modelArbustoDelante);
             arbusto.Draw(shaderPerro);
 
-            // Reutilizar las tres mallas de roca con seis transformaciones editables.
-            for (int i = 0; i < 6; ++i)
+            // Dibujar las 12 rocas usando los 4 modelos nuevos.
+            glUseProgram(paisaje);
+            Matriz(paisaje, "projection", projection);
+            Matriz(paisaje, "view", view);
+            glUniform1f(glGetUniformLocation(paisaje, "unidad"), unidad);
+            glUniform1i(glGetUniformLocation(paisaje, "esPasto"), 1);
+
+            for (int i = 0; i < CANTIDAD_ROCAS; ++i)
             {
-                Matriz(shaderPerro.Program, "model", modelRoca[i]);
-                if (TIPO_ROCA[i] == 0) roca1.Draw(shaderPerro);
-                else if (TIPO_ROCA[i] == 1) roca2.Draw(shaderPerro);
-                else roca3.Draw(shaderPerro);
+                Matriz(paisaje, "model", modelRoca[i]);
+                rocaMalla[TIPO_ROCA[i]].Dibujar();
             }
+
+            // Regresar al shader de los modelos texturizados.
+            shaderPerro.Use();
+            Matriz(shaderPerro.Program, "projection", projection);
+            Matriz(shaderPerro.Program, "view", view);
 
             // Aplicar la posicion, rotacion y escala elegidas para el perro.
             Matriz(shaderPerro.Program, "model", modelDog);
@@ -862,9 +1415,39 @@ int main()
             Matriz(shaderPerro.Program, "model", modelLlama);
             llama.Draw(shaderPerro);
 
+            // ---------------------------------------------------------
+            // BRILLOS DORADOS: cofre + BigPot.
+            // El del cofre es más amplio para imitar el resplandor de Fortnite.
+            // ---------------------------------------------------------
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            glDepthMask(GL_FALSE);
+
+            glUseProgram(brillo);
+            Matriz(brillo, "projection", projection);
+            Matriz(brillo, "view", view);
+
+            Matriz(brillo, "model", modelBrilloCofre);
+            brilloBigPot.Dibujar();
+
+            Matriz(brillo, "model", modelBrilloBigPot);
+            brilloBigPot.Dibujar();
+
+            glDepthMask(GL_TRUE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDisable(GL_BLEND);
+
+            // Volver al shader de modelos y dibujar BigPot delante del cofre.
+            shaderPerro.Use();
+            Matriz(shaderPerro.Program, "projection", projection);
+            Matriz(shaderPerro.Program, "view", view);
+            Matriz(shaderPerro.Program, "model", modelBigPot);
+            bigPot.Draw(shaderPerro);
+
             // COFRE: transformacion propia, independiente de perro y llama.
             Matriz(shaderPerro.Program, "model", modelCofre);
             cofre.Draw(shaderPerro);
+
             // Dibujar la caja de municiones.
             Matriz(shaderPerro.Program, "model", modelMunicion);
             municion.Draw(shaderPerro);
@@ -872,9 +1455,14 @@ int main()
         }
         terreno.Liberar();
         pasto.Liberar();
-        nubes.Liberar();
-        arbolMalla.Liberar();
+        brilloBigPot.Liberar();
+        for (int i = 0; i < 4; ++i)
+            rocaMalla[i].Liberar();
+
+        glDeleteProgram(brillo);
         glDeleteProgram(paisaje);
+        glDeleteProgram(cielo);
+        glDeleteVertexArrays(1, &pantallaVAO);
     }
     catch (const std::exception& e)
     {
