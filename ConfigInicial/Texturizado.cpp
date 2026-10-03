@@ -1,301 +1,709 @@
-// Previo práctica #7
+// Práctica #7
 // Bello Zaragoza Demian
-// Fecha de entrega 28 septiembre 2026
-// Número de cuenta 320200928
+// Fecha de entrega: 3 octubre 2026
+// Número de cuenta: 320200928
 
 #include <iostream>
-#include <cmath>
+#include <cstdlib>
 
-// GLEW
 #include <GL/glew.h>
-
-// GLFW
 #include <GLFW/glfw3.h>
 
-// Other Libs
 #include "stb_image.h"
 
-// GLM Mathematics
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Other includes
 #include "Shader.h"
 #include "Camera.h"
 
-
-// Function prototypes
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
+// Funciones
+void KeyCallback(
+    GLFWwindow* window, int key, int scancode, int action, int mode
+);
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
 
-// Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
-int SCREEN_WIDTH, SCREEN_HEIGHT;
+// Ventana
+const GLuint WIDTH = 800;
+const GLuint HEIGHT = 600;
+int SCREEN_WIDTH = 0;
+int SCREEN_HEIGHT = 0;
 
-// Camera
-Camera  camera(glm::vec3(0.0f, 0.0f, 3.0f));
-GLfloat lastX = WIDTH / 2.0;
-GLfloat lastY = HEIGHT / 2.0;
-bool keys[1024];
+// Cámara
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+GLfloat lastX = WIDTH / 2.0f;
+GLfloat lastY = HEIGHT / 2.0f;
+bool keys[1024] = { false };
 bool firstMouse = true;
 
-// Light attributes
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+// Tiempo
+GLfloat deltaTime = 0.0f;
+GLfloat lastFrame = 0.0f;
 
-// Deltatime
-GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
-GLfloat lastFrame = 0.0f;  	// Time of last frame
+// Parámetros del cordoncito.
+// Puedes modificar estos valores.
+const float ALTURA_ARCO = 1.25f;
+const float GROSOR_CORDON = 0.025f;
+const int SEGMENTOS_CORDON = 80;
 
-// The MAIN function, from here we start the application and run the game loop
 int main()
 {
-	// Init GLFW
-	glfwInit();
-	// Set all the required options for GLFW
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    if (!glfwInit())
+    {
+        std::cerr << "No se pudo iniciar GLFW" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica #7 Bello Zaragoza Demian", nullptr, nullptr);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	if (nullptr == window)
-	{
-		std::cout << "Failed to create GLFW window" << std::endl;
-		glfwTerminate();
+    GLFWwindow* window = glfwCreateWindow(
+        WIDTH,
+        HEIGHT,
+        "Practica #7 Bello Zaragoza Demian",
+        nullptr,
+        nullptr
+    );
 
-		return EXIT_FAILURE;
-	}
+    if (window == nullptr)
+    {
+        std::cerr << "No se pudo crear la ventana GLFW" << std::endl;
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
 
-	glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window);
+    glfwGetFramebufferSize(window, &SCREEN_WIDTH, &SCREEN_HEIGHT);
 
-	glfwGetFramebufferSize(window, &SCREEN_WIDTH, &SCREEN_HEIGHT);
+    glfwSetKeyCallback(window, KeyCallback);
+    glfwSetCursorPosCallback(window, MouseCallback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-	// Set the required callback functions
-	glfwSetKeyCallback(window, KeyCallback);
-	glfwSetCursorPosCallback(window, MouseCallback);
+    glewExperimental = GL_TRUE;
 
-	// GLFW Options
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glewInit() != GLEW_OK)
+    {
+        std::cerr << "No se pudo iniciar GLEW" << std::endl;
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
 
-	// Set this to true so GLEW knows to use a modern approach to retrieving function pointers and extensions
-	glewExperimental = GL_TRUE;
-	// Initialize GLEW to setup the OpenGL Function pointers
-	if (GLEW_OK != glewInit())
-	{
-		std::cout << "Failed to initialize GLEW" << std::endl;
-		return EXIT_FAILURE;
-	}
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glEnable(GL_DEPTH_TEST);
 
-	// Define the viewport dimensions
-	glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	// OpenGL options
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    Shader lampShader("Shader/lamp.vs", "Shader/lamp.frag");
+    lampShader.Use();
 
+    glUniform1i(
+        glGetUniformLocation(lampShader.Program, "ourTexture"),
+        0
+    );
 
-	// Build and compile our shader program
-	Shader lampShader("Shader/lamp.vs", "Shader/lamp.frag");
-	lampShader.Use();
-	glUniform1i(glGetUniformLocation(lampShader.Program, "ourTexture"), 0);
+    /*
+        Cada vértice tiene 8 valores:
 
-	// Set up vertex data (and buffer(s)) and attribute pointers
-	GLfloat vertices[] =
-	{
-		// Positions            // Colors              // Texture Coords
-		-0.5f, -0.5f, 0.0f,    1.0f, 1.0f,1.0f,		0.0f,0.0f,
-		0.5f, -0.5f, 0.0f,	   1.0f, 1.0f,1.0f,		1.0f,0.0f,
-		0.5f,  0.5f, 0.0f,     1.0f, 1.0f,1.0f,	    1.0f,1.0f,
-		-0.5f,  0.5f, 0.0f,    1.0f, 1.0f,1.0f,		0.0f,1.0f,
+        X, Y, Z,   R, G, B,   U, V
 
+        Las coordenadas UV se conservan como las acomodaste.
+    */
 
-	};
+    GLfloat vertices[] =
+    {
+        // ================= CARA FRONTAL =================
+        // Posición              Color     U         V
+        -0.5f, -0.5f,  0.5f,    1, 1, 1,  0.2925f, 0.34f,
+         0.5f, -0.5f,  0.5f,    1, 1, 1,  0.51f,   0.34f,
+         0.5f,  0.5f,  0.5f,    1, 1, 1,  0.51f,   0.6667f,
+        -0.5f,  0.5f,  0.5f,    1, 1, 1,  0.2925f, 0.6667f,
 
-	GLuint indices[] =
-	{  // Note that we start from 0!
-		0,1,3,
-		1,2,3
+        // ================= CARA DERECHA =================
+         0.5f, -0.5f,  0.5f,    1, 1, 1,  0.5050f, 0.340f,
+         0.5f, -0.5f, -0.5f,    1, 1, 1,  0.724f,  0.3400f,
+         0.5f,  0.5f, -0.5f,    1, 1, 1,  0.724f,  0.6667f,
+         0.5f,  0.5f,  0.5f,    1, 1, 1,  0.5050f, 0.6667f,
 
-	};
+         // ================= CARA TRASERA =================
+          0.5f, -0.5f, -0.5f,    1, 1, 1,  0.72f,  0.34f,
+         -0.5f, -0.5f, -0.5f,    1, 1, 1,  0.935f, 0.34f,
+         -0.5f,  0.5f, -0.5f,    1, 1, 1,  0.935f, 0.6667f,
+          0.5f,  0.5f, -0.5f,    1, 1, 1,  0.72f,  0.6667f,
 
-	// First, set the container's VAO (and VBO)
-	GLuint VBO, VAO, EBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
+          // ================= CARA IZQUIERDA =================
+          -0.5f, -0.5f, -0.5f,    1, 1, 1,  0.0685f, 0.34f,
+          -0.5f, -0.5f,  0.5f,    1, 1, 1,  0.295f,  0.34f,
+          -0.5f,  0.5f,  0.5f,    1, 1, 1,  0.295f,  0.6667f,
+          -0.5f,  0.5f, -0.5f,    1, 1, 1,  0.0685f, 0.6667f,
 
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+          // ================= CARA SUPERIOR =================
+          -0.5f,  0.5f,  0.5f,    1, 1, 1,  0.2925f, 0.6667f,
+           0.5f,  0.5f,  0.5f,    1, 1, 1,  0.51f,   0.6667f,
+           0.5f,  0.5f, -0.5f,    1, 1, 1,  0.51f,   0.9814f,
+          -0.5f,  0.5f, -0.5f,    1, 1, 1,  0.2925f, 0.9814f,
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+          // ================= CARA INFERIOR =================
+          -0.5f, -0.5f, -0.5f,    1, 1, 1,  0.2925f, 0.018753f,
+           0.5f, -0.5f, -0.5f,    1, 1, 1,  0.51f,   0.018753f,
+           0.5f, -0.5f,  0.5f,    1, 1, 1,  0.51f,   0.3475f,
+          -0.5f, -0.5f,  0.5f,    1, 1, 1,  0.2925f, 0.3475f
+    };
 
-	// Position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-	// Color attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-	glEnableVertexAttribArray(1);
-	// Texture Coordinate attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(6 * sizeof(GLfloat)));
-	glEnableVertexAttribArray(2);
-	glBindVertexArray(0);
+    GLuint indices[] =
+    {
+         0,  1,  2,   0,  2,  3,
+         4,  5,  6,   4,  6,  7,
+         8,  9, 10,   8, 10, 11,
+        12, 13, 14,  12, 14, 15,
+        16, 17, 18,  16, 18, 19,
+        20, 21, 22,  20, 22, 23
+    };
 
-	// Load the transparent wooden window texture.
-	GLuint texture1;
-	glGenTextures(1, &texture1);
-	glBindTexture(GL_TEXTURE_2D, texture1);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GLuint VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
-	int textureWidth = 0, textureHeight = 0, nrChannels = 0;
-	stbi_set_flip_vertically_on_load(true);
-	const char* texturePath = "images/window.png";
-	unsigned char* image = stbi_load(texturePath, &textureWidth, &textureHeight, &nrChannels, 0);
-	if (!image)
-	{
-		std::cerr << "Failed to load " << texturePath << ": " << stbi_failure_reason() << std::endl;
-		glfwTerminate();
-		return EXIT_FAILURE;
-	}
-	if (nrChannels != 4)
-	{
-		std::cerr << "The window texture needs an alpha channel (RGBA); channels: " << nrChannels << std::endl;
-		stbi_image_free(image);
-		glfwTerminate();
-		return EXIT_FAILURE;
-	}
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureWidth, textureHeight,
-		0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	stbi_image_free(image);
+    glBindVertexArray(VAO);
 
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        sizeof(vertices),
+        vertices,
+        GL_STATIC_DRAW
+    );
 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        sizeof(indices),
+        indices,
+        GL_STATIC_DRAW
+    );
 
-	// Game loop
-	while (!glfwWindowShouldClose(window))
-	{
-		// Calculate deltatime of current frame
-		GLfloat currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
+    // Posición
+    glVertexAttribPointer(
+        0, 3, GL_FLOAT, GL_FALSE,
+        8 * sizeof(GLfloat),
+        (GLvoid*)0
+    );
+    glEnableVertexAttribArray(0);
 
-		// Check if any events have been activiated (key pressed, mouse moved etc.) and call corresponding response functions
-		glfwPollEvents();
-		DoMovement();
+    // Color
+    glVertexAttribPointer(
+        1, 3, GL_FLOAT, GL_FALSE,
+        8 * sizeof(GLfloat),
+        (GLvoid*)(3 * sizeof(GLfloat))
+    );
+    glEnableVertexAttribArray(1);
 
-		// Clear the colorbuffer
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Coordenadas UV
+    glVertexAttribPointer(
+        2, 2, GL_FLOAT, GL_FALSE,
+        8 * sizeof(GLfloat),
+        (GLvoid*)(6 * sizeof(GLfloat))
+    );
+    glEnableVertexAttribArray(2);
 
-		lampShader.Use();
-		//// Create camera transformations
-		glm::mat4 view;
-		view = camera.GetViewMatrix();
-		glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f);
-		glm::mat4 model(1);
-		// Get location objects for the matrices on the lamp shader (these could be different on a different shader)
-		// Get the uniform locations
-		GLint modelLoc = glGetUniformLocation(lampShader.Program, "model");
-		GLint viewLoc = glGetUniformLocation(lampShader.Program, "view");
-		GLint projLoc = glGetUniformLocation(lampShader.Program, "projection");
+    glBindVertexArray(0);
 
-		// Bind diffuse map
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture1);
+    // ================= TEXTURA DE LOS DADOS =================
 
-		// Set matrices
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		// Draw the light object (using light's vertex attributes)
-		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
+    GLuint texture1;
+    glGenTextures(1, &texture1);
 
-		// Swap the screen buffers
-		glfwSwapBuffers(window);
-	}
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture1);
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
-	glDeleteTextures(1, &texture1);
-	// Terminate GLFW, clearing any resources allocated by GLFW.
-	glfwTerminate();
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D,
+        GL_TEXTURE_MIN_FILTER,
+        GL_LINEAR_MIPMAP_LINEAR
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+    );
 
-	return 0;
+    int textureWidth = 0;
+    int textureHeight = 0;
+    int nrChannels = 0;
+
+    stbi_set_flip_vertically_on_load(true);
+
+    const char* texturePath = "images/dice_v2.png";
+
+    unsigned char* image = stbi_load(
+        texturePath,
+        &textureWidth,
+        &textureHeight,
+        &nrChannels,
+        0
+    );
+
+    if (image == nullptr)
+    {
+        std::cerr << "No se pudo cargar " << texturePath
+            << ": " << stbi_failure_reason() << std::endl;
+
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &EBO);
+        glDeleteTextures(1, &texture1);
+
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
+
+    if (nrChannels != 4)
+    {
+        std::cerr << texturePath
+            << " necesita canal alfa (RGBA). Canales: "
+            << nrChannels << std::endl;
+
+        stbi_image_free(image);
+
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &EBO);
+        glDeleteTextures(1, &texture1);
+
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        textureWidth,
+        textureHeight,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        image
+    );
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(image);
+
+    // ================= TEXTURA NEGRA DEL CORDON =================
+    // Se crea en memoria; no necesita otra imagen.
+
+    GLuint texturaCordon;
+    glGenTextures(1, &texturaCordon);
+    glBindTexture(GL_TEXTURE_2D, texturaCordon);
+
+    unsigned char pixelNegro[] = { 0, 0, 0, 255 };
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        1, 1,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        pixelNegro
+    );
+
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE
+    );
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE
+    );
+
+    GLint modelLoc = glGetUniformLocation(
+        lampShader.Program, "model"
+    );
+    GLint viewLoc = glGetUniformLocation(
+        lampShader.Program, "view"
+    );
+    GLint projLoc = glGetUniformLocation(
+        lampShader.Program, "projection"
+    );
+
+    // ================= CICLO DE DIBUJO =================
+
+    while (!glfwWindowShouldClose(window))
+    {
+        GLfloat currentFrame = static_cast<GLfloat>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        glfwPollEvents();
+        DoMovement();
+
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        lampShader.Use();
+
+        glm::mat4 view = camera.GetViewMatrix();
+
+        // Conserva la llamada a perspectiva de tu código.
+        glm::mat4 projection = glm::perspective(
+            camera.GetZoom(),
+            static_cast<GLfloat>(SCREEN_WIDTH) / SCREEN_HEIGHT,
+            0.1f,
+            100.0f
+        );
+
+        glUniformMatrix4fv(
+            viewLoc, 1, GL_FALSE, glm::value_ptr(view)
+        );
+        glUniformMatrix4fv(
+            projLoc, 1, GL_FALSE, glm::value_ptr(projection)
+        );
+
+        // Restaurar la textura de los dados cada cuadro.
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        glBindVertexArray(VAO);
+
+        // ================= DADO IZQUIERDO =================
+
+        glm::mat4 model1(1.0f);
+
+        // Posición: X, Y, Z
+        model1 = glm::translate(
+            model1,
+            glm::vec3(-0.65f, 0.15f, 0.0f)
+        );
+
+        // Rotación en X
+        model1 = glm::rotate(
+            model1,
+            glm::radians(180.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f)
+        );
+
+        // Rotación en Y
+        model1 = glm::rotate(
+            model1,
+            glm::radians(-20.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+
+        // Rotación en Z
+        model1 = glm::rotate(
+            model1,
+            glm::radians(-52.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f)
+        );
+
+        // Tamaño
+        model1 = glm::scale(
+            model1,
+            glm::vec3(0.85f)
+        );
+
+        glUniformMatrix4fv(
+            modelLoc, 1, GL_FALSE, glm::value_ptr(model1)
+        );
+
+        glDrawElements(
+            GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0
+        );
+
+        // ================= DADO DERECHO =================
+
+        glm::mat4 model2(1.0f);
+
+        // Posición
+        model2 = glm::translate(
+            model2,
+            glm::vec3(0.60f, -0.10f, 0.0f)
+        );
+
+        // Rotación en X
+        model2 = glm::rotate(
+            model2,
+            glm::radians(10.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f)
+        );
+
+        // Girar hacia el otro lado para mostrar otra cara lateral.
+        model2 = glm::rotate(
+            model2,
+            glm::radians(-55.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+
+        // Ladearlo en el sentido contrario al giro anterior.
+        model2 = glm::rotate(
+            model2,
+            glm::radians(-25.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f)
+        );
+
+        model2 = glm::scale(
+            model2,
+            glm::vec3(0.85f)
+        );
+
+        glUniformMatrix4fv(
+            modelLoc, 1, GL_FALSE, glm::value_ptr(model2)
+        );
+
+        glDrawElements(
+            GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0
+        );
+
+        // ================= CORDONCITO NEGRO =================
+
+        // Conexiones ligeramente dentro de las caras superiores.
+        // Se transforman con cada dado para seguir su movimiento.
+        glm::vec3 inicio = glm::vec3(
+            model1 * glm::vec4(0.0f, 0.48f, 0.0f, 1.0f)
+        );
+
+        glm::vec3 fin = glm::vec3(
+            model2 * glm::vec4(0.0f, 0.48f, 0.0f, 1.0f)
+        );
+
+        // Dos puntos de control:
+        // el primero levanta el arco;
+        // el segundo crea un doblez antes de llegar al dado derecho.
+
+        // Punto alto donde se unen las dos curvas.
+        // Aumenta 1.10f si quieres elevar todavía más el cordón.
+       // Unión entre las dos curvas.
+        // La bajamos para crear un doblez entre ambos arcos.
+        glm::vec3 puntoAlto = (inicio + fin) * 0.5f;
+        puntoAlto.y += 0.55f;
+
+        // Primera curva: sube bastante y después baja.
+        glm::vec3 controlA = inicio + glm::vec3(
+            0.60f, 1.80f, 0.0f
+        );
+
+        // Hace que la curva pase por un pequeño valle
+        // antes de alcanzar la unión.
+        glm::vec3 controlB = puntoAlto + glm::vec3(
+            -0.30f, -0.35f, 0.0f
+        );
+
+        // Segunda curva: vuelve a subir.
+        // Mantiene una unión suave con la primera.
+        glm::vec3 controlC = puntoAlto + glm::vec3(
+            0.30f, 0.35f, 0.0f
+        );
+
+        // Forma el segundo arco antes de bajar al dado derecho.
+        glm::vec3 controlD = fin + glm::vec3(
+            -0.10f, 1.10f, 0.0f
+        );
+
+        // Evaluar una curva de Bézier cúbica.
+        auto bezier = [](
+            float t,
+            const glm::vec3& p0,
+            const glm::vec3& p1,
+            const glm::vec3& p2,
+            const glm::vec3& p3
+            ) -> glm::vec3
+            {
+                float u = 1.0f - t;
+
+                return
+                    u * u * u * p0 +
+                    3.0f * u * u * t * p1 +
+                    3.0f * u * t * t * p2 +
+                    t * t * t * p3;
+            };
+
+        // Recorrer las dos curvas como un solo cordón.
+        // La unión en puntoAlto es suave.
+        auto puntoCordon = [&](float t) -> glm::vec3
+            {
+                if (t <= 0.5f)
+                {
+                    return bezier(
+                        t * 2.0f,
+                        inicio,
+                        controlA,
+                        controlB,
+                        puntoAlto
+                    );
+                }
+
+                return bezier(
+                    (t - 0.5f) * 2.0f,
+                    puntoAlto,
+                    controlC,
+                    controlD,
+                    fin
+                );
+            };
+
+        glBindTexture(GL_TEXTURE_2D, texturaCordon);
+
+        // Reutilizar el cubo como segmentos muy delgados.
+        for (int i = 0; i < SEGMENTOS_CORDON; ++i)
+        {
+            float t0 =
+                static_cast<float>(i) / SEGMENTOS_CORDON;
+
+            float t1 =
+                static_cast<float>(i + 1) / SEGMENTOS_CORDON;
+
+            glm::vec3 a = puntoCordon(t0);
+            glm::vec3 b = puntoCordon(t1);
+
+            glm::vec3 diferencia = b - a;
+            float longitud = glm::length(diferencia);
+
+            if (longitud < 0.00001f)
+                continue;
+
+            // Dirección del segmento.
+            glm::vec3 ejeY = diferencia / longitud;
+
+            // Eje auxiliar para construir su orientación.
+            glm::vec3 auxiliar(0.0f, 0.0f, 1.0f);
+
+            if (glm::abs(glm::dot(ejeY, auxiliar)) > 0.95f)
+            {
+                auxiliar = glm::vec3(1.0f, 0.0f, 0.0f);
+            }
+
+            glm::vec3 ejeX = glm::normalize(
+                glm::cross(ejeY, auxiliar)
+            );
+
+            glm::vec3 ejeZ = glm::normalize(
+                glm::cross(ejeX, ejeY)
+            );
+
+            glm::mat4 orientacion(1.0f);
+
+            orientacion[0] = glm::vec4(ejeX, 0.0f);
+            orientacion[1] = glm::vec4(ejeY, 0.0f);
+            orientacion[2] = glm::vec4(ejeZ, 0.0f);
+
+            // Colocar el segmento en el punto medio.
+            glm::mat4 modelCordon = glm::translate(
+                glm::mat4(1.0f),
+                (a + b) * 0.5f
+            );
+
+            // Orientarlo a lo largo de la curva.
+            modelCordon = modelCordon * orientacion;
+
+            // Darle grosor y longitud.
+            // Los segmentos se solapan para evitar huecos.
+            modelCordon = glm::scale(
+                modelCordon,
+                glm::vec3(
+                    GROSOR_CORDON,
+                    longitud + GROSOR_CORDON,
+                    GROSOR_CORDON
+                )
+            );
+
+            glUniformMatrix4fv(
+                modelLoc,
+                1,
+                GL_FALSE,
+                glm::value_ptr(modelCordon)
+            );
+
+            glDrawElements(
+                GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0
+            );
+        }
+
+        glBindVertexArray(0);
+
+        glfwSwapBuffers(window);
+    }
+
+    // ================= LIBERAR RECURSOS =================
+
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+    glDeleteTextures(1, &texture1);
+    glDeleteTextures(1, &texturaCordon);
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+
+    return 0;
 }
 
-// Moves/alters the camera positions based on user input
 void DoMovement()
 {
-	// Camera controls
-	if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])
-	{
-		camera.ProcessKeyboard(FORWARD, deltaTime);
-	}
+    if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])
+        camera.ProcessKeyboard(FORWARD, deltaTime);
 
-	if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])
-	{
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
-	}
+    if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])
+        camera.ProcessKeyboard(BACKWARD, deltaTime);
 
-	if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
-	{
-		camera.ProcessKeyboard(LEFT, deltaTime);
-	}
+    if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
+        camera.ProcessKeyboard(LEFT, deltaTime);
 
-	if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
-	{
-		camera.ProcessKeyboard(RIGHT, deltaTime);
-	}
+    if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
+        camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-// Is called whenever a key is pressed/released via GLFW
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
+void KeyCallback(
+    GLFWwindow* window,
+    int key,
+    int scancode,
+    int action,
+    int mode
+)
 {
-	if (GLFW_KEY_ESCAPE == key && GLFW_PRESS == action)
-	{
-		glfwSetWindowShouldClose(window, GL_TRUE);
-	}
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
 
-	if (key >= 0 && key < 1024)
-	{
-		if (action == GLFW_PRESS)
-		{
-			keys[key] = true;
-		}
-		else if (action == GLFW_RELEASE)
-		{
-			keys[key] = false;
-		}
-	}
+    if (key >= 0 && key < 1024)
+    {
+        if (action == GLFW_PRESS)
+            keys[key] = true;
+        else if (action == GLFW_RELEASE)
+            keys[key] = false;
+    }
 }
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)
 {
-	if (firstMouse)
-	{
-		lastX = xPos;
-		lastY = yPos;
-		firstMouse = false;
-	}
+    if (firstMouse)
+    {
+        lastX = static_cast<GLfloat>(xPos);
+        lastY = static_cast<GLfloat>(yPos);
+        firstMouse = false;
+    }
 
-	GLfloat xOffset = xPos - lastX;
-	GLfloat yOffset = lastY - yPos;  // Reversed since y-coordinates go from bottom to left
+    GLfloat xOffset = static_cast<GLfloat>(xPos) - lastX;
+    GLfloat yOffset = lastY - static_cast<GLfloat>(yPos);
 
-	lastX = xPos;
-	lastY = yPos;
+    lastX = static_cast<GLfloat>(xPos);
+    lastY = static_cast<GLfloat>(yPos);
 
-	camera.ProcessMouseMovement(xOffset, yOffset);
+    camera.ProcessMouseMovement(xOffset, yOffset);
 }
