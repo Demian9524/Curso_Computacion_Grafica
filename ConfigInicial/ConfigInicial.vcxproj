@@ -26,6 +26,12 @@
     <ClCompile Include="Iluminacion.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shader\astro.frag" />
+    <None Include="Shader\astro.vs" />
+    <None Include="Shader\ciclo.frag" />
+    <None Include="Shader\ciclo.vs" />
+    <None Include="Shader\core.frag" />
+    <None Include="Shader\core.vs" />
     <None Include="Shader\lamp.frag" />
     <None Include="Shader\lamp.vs" />
     <None Include="Shader\lighting.frag" />
