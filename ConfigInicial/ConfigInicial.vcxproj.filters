@@ -26,11 +26,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Iluminacion.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Shader\lamp.frag">
       <Filter>Archivos de origen\Shader</Filter>
     </None>
@@ -67,5 +62,10 @@
     <None Include="Shader\core.vs">
       <Filter>Archivos de origen\Shader</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="fuentesDeLuz.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

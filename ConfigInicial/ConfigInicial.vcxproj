@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -23,21 +23,13 @@
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Iluminacion.cpp" />
+    <ClCompile Include="fuentesDeLuz.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shader\astro.frag" />
-    <None Include="Shader\astro.vs" />
-    <None Include="Shader\ciclo.frag" />
-    <None Include="Shader\ciclo.vs" />
-    <None Include="Shader\core.frag" />
-    <None Include="Shader\core.vs" />
     <None Include="Shader\lamp.frag" />
     <None Include="Shader\lamp.vs" />
     <None Include="Shader\lighting.frag" />
     <None Include="Shader\lighting.vs" />
-    <None Include="Shader\modelLoading.frag" />
-    <None Include="Shader\modelLoading.vs" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
