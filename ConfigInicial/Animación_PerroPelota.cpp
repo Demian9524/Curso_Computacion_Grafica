@@ -1,6 +1,6 @@
-// Previo Practica #10 
+// Practica #10
 // Bello Zaragoza Demian
-// Fecha de entrega: 19 de octubre 2026
+// Fecha de entrega: 24 de octubre de 2026
 // Número de cuenta: 320200928
 
 
@@ -52,9 +52,9 @@ bool keys[1024];
 bool firstMouse = true;
 // Light attributes
 glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
-bool active;
 
-// Positions of the point lights
+
+// Referencia de altura para el modo P (no se dibuja ni emite luz).
 glm::vec3 pointLightPositions[] = {
 	glm::vec3(0.0f,2.0f, 0.0f),
 	glm::vec3(0.0f,0.0f, 0.0f),
@@ -62,60 +62,14 @@ glm::vec3 pointLightPositions[] = {
 	glm::vec3(0.0f,0.0f, 0.0f)
 };
 
-float vertices[] = {
-	 -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-		0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-		0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-		0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	   -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	   -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 
-	   -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-		0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-		0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-		0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-	   -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-	   -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
-
-	   -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-	   -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	   -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	   -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	   -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-	   -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-
-		0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-		0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-		0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-		0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-
-	   -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-		0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-		0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-		0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-	   -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-	   -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-
-	   -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-		0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-		0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-		0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-	   -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-	   -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
-};
-
-
-
-glm::vec3 Light1 = glm::vec3(0);
 //Anim
 float rotBall = 0;
 bool AnimBall = false; // Giro original, controlado con N.
 
 // Animacion vertical independiente, controlada unicamente con P.
 bool AnimVertical = false;
-enum ModoAnimacionPelota { MODO_GIRO, MODO_VERTICAL };
+enum ModoAnimacionPelota { MODO_GIRO, MODO_VERTICAL, MODO_CABEZAZOS };
 ModoAnimacionPelota modoPelota = MODO_GIRO;
 double tiempoVertical = 0.0;
 const double PERIODO_VERTICAL = 4.0;
@@ -146,6 +100,118 @@ static bool MedirAlturaPelota(const char* ruta, float& centroY) {
 }
 
 
+// NUEVA ANIMACION: B inicia/pausa/reanuda; N y P conservan sus modos.
+// Sentidos definidos mirando la escena desde arriba (+Y).
+const double PI_ANIM = 3.14159265358979323846;
+const double SEGUNDOS_VUELTA = 8.0;
+const float RADIO_EN_ALTURAS = 1.35f;
+const float SALTO_EN_ALTURAS = 0.32f;
+const float SEPARACION_PELOTA_EN_ALTURAS = 0.65f;
+
+// Ajustes manuales del contacto, en unidades relativas a la altura del perro.
+// La referencia inicial es el centro inferior de ball.obj, junto a la nariz.
+const glm::vec3 AJUSTE_NARIZ(0.0f, 0.0f, 0.0f);
+const float AJUSTE_FRENTE_GRADOS = 0.0f; // Solo si el OBJ no mira hacia +Z.
+bool AnimCabezas = false;
+double tiempoCabezas = 0.0;
+float radioRecorrido = 1.0f, alturaPerro = 1.0f, radioPelotaY = 0.1f;
+float alturaSalto = 0.0f, alturaContacto = 0.0f;
+glm::vec3 centroPelotaOriginal(0.0f), narizOriginal(0.0f), centroRecorrido(0.0f);
+glm::mat4 matrizPerroAnimada(1.0f), matrizPelotaAnimada(1.0f);
+
+static bool MedirCajaOBJ(const char* ruta, glm::vec3& minimo, glm::vec3& maximo) {
+	std::ifstream archivo(ruta);
+	if (!archivo) return false;
+	const float limite = (std::numeric_limits<float>::max)();
+	minimo = glm::vec3(limite); maximo = glm::vec3(-limite);
+	bool encontrado = false;
+	std::string linea, tipo;
+	while (std::getline(archivo, linea)) {
+		std::istringstream datos(linea);
+		glm::vec3 p;
+		if ((datos >> tipo) && tipo == "v" && (datos >> p.x >> p.y >> p.z)) {
+			minimo = glm::min(minimo, p); maximo = glm::max(maximo, p);
+			encontrado = true;
+		}
+	}
+	return encontrado;
+}
+
+static void ActualizarCabezas() {
+	const double fase = 2.0 * PI_ANIM * tiempoCabezas / SEGUNDOS_VUELTA;
+	// Velocidad variable y siempre positiva: desaceleran cerca del contacto.
+	const double angulo = fase - 0.10 * std::sin(4.0 * fase);
+	const double anguloPerro = angulo;
+	const double anguloPelota = PI_ANIM - angulo;
+	const double intervaloGolpes = SEGUNDOS_VUELTA * 0.5;
+	const double primerGolpe = SEGUNDOS_VUELTA * 0.25;
+	const double respectoGolpe = std::remainder(
+		tiempoCabezas - primerGolpe, intervaloGolpes);
+	// Salto breve con trayectoria parabolica: despegue, apice y aterrizaje.
+	const double medioSalto = 0.48;
+	const double u = respectoGolpe / medioSalto;
+	const float salto = (std::abs(u) < 1.0)
+		? alturaSalto * static_cast<float>(1.0 - u * u) : 0.0f;
+	// Pelota: tras el golpe sube, pierde velocidad y vuelve a caer.
+	double desdeGolpe = std::fmod(tiempoCabezas - primerGolpe, intervaloGolpes);
+	if (desdeGolpe < 0.0) desdeGolpe += intervaloGolpes;
+	const float q = static_cast<float>(desdeGolpe / intervaloGolpes);
+	const float arco = 4.0f * q * (1.0f - q);
+	const float yPelota = alturaContacto + radioPelotaY + alturaSalto
+		+ alturaPerro * SEPARACION_PELOTA_EN_ALTURAS * arco;
+	glm::vec3 posicionPelota(
+		centroRecorrido.x + radioRecorrido * static_cast<float>(std::cos(anguloPelota)),
+		yPelota,
+		centroRecorrido.z + radioRecorrido * static_cast<float>(std::sin(anguloPelota)));
+
+	matrizPerroAnimada = glm::translate(glm::mat4(1.0f), centroRecorrido);
+	matrizPerroAnimada = glm::rotate(matrizPerroAnimada,
+		static_cast<float>(-anguloPerro), glm::vec3(0, 1, 0));
+	matrizPerroAnimada = glm::translate(matrizPerroAnimada,
+		glm::vec3(radioRecorrido, salto, 0.0f));
+	matrizPerroAnimada = glm::rotate(matrizPerroAnimada,
+		glm::radians(AJUSTE_FRENTE_GRADOS), glm::vec3(0, 1, 0));
+	matrizPerroAnimada = glm::translate(matrizPerroAnimada,
+		glm::vec3(-narizOriginal.x, 0.0f, -narizOriginal.z));
+
+	// Quitar el desplazamiento interno del OBJ para que su centro siga la orbita.
+	matrizPelotaAnimada = glm::translate(glm::mat4(1.0f), posicionPelota);
+	matrizPelotaAnimada = glm::rotate(matrizPelotaAnimada,
+		static_cast<float>(angulo), glm::vec3(0, 1, 0));
+	matrizPelotaAnimada = glm::translate(matrizPelotaAnimada, -centroPelotaOriginal);
+}
+
+static bool PrepararCabezas() {
+	glm::vec3 dMin, dMax, bMin, bMax, pMin, pMax;
+	if (!MedirCajaOBJ("Models/RedDog.obj", dMin, dMax) ||
+		!MedirCajaOBJ("Models/ball.obj", bMin, bMax)) return false;
+	alturaPerro = dMax.y - dMin.y;
+	if (alturaPerro < 0.0001f || bMax.y - bMin.y < 0.0001f) return false;
+	centroPelotaOriginal = (bMin + bMax) * 0.5f;
+	radioPelotaY = (bMax.y - bMin.y) * 0.5f;
+	narizOriginal = glm::vec3(centroPelotaOriginal.x, bMin.y,
+		centroPelotaOriginal.z) + AJUSTE_NARIZ * alturaPerro;
+	alturaContacto = narizOriginal.y;
+	alturaSalto = alturaPerro * SALTO_EN_ALTURAS;
+	centroRecorrido = glm::vec3((dMin.x + dMax.x) * 0.5f, 0.0f,
+		(dMin.z + dMax.z) * 0.5f);
+	radioRecorrido = alturaPerro * RADIO_EN_ALTURAS;
+	// Centrar el recorrido en el piso y reservar margen para el cuerpo del perro.
+	if (MedirCajaOBJ("Models/piso.obj", pMin, pMax)) {
+		centroRecorrido.x = (pMin.x + pMax.x) * 0.5f;
+		centroRecorrido.z = (pMin.z + pMax.z) * 0.5f;
+		float alcanceX = glm::max(std::abs(dMin.x - narizOriginal.x), std::abs(dMax.x - narizOriginal.x));
+		float alcanceZ = glm::max(std::abs(dMin.z - narizOriginal.z), std::abs(dMax.z - narizOriginal.z));
+		float margen = std::sqrt(alcanceX * alcanceX + alcanceZ * alcanceZ);
+		float disponible = 0.5f * glm::min(pMax.x - pMin.x, pMax.z - pMin.z) - margen;
+		if (disponible > alturaPerro * 0.3f)
+			radioRecorrido = glm::min(radioRecorrido, disponible * 0.9f);
+		else std::cerr << "Aviso: piso pequeno para el recorrido; revisa RADIO_EN_ALTURAS.\n";
+	}
+	ActualizarCabezas();
+	return true;
+}
+
 // Deltatime
 GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
 GLfloat lastFrame = 0.0f;  	// Time of last frame
@@ -162,7 +228,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo 10 - Bello Zaragoza Demian ", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica 10 Bello Zaragoza Demian", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -198,7 +264,7 @@ int main()
 
 
 	Shader lightingShader("Shader/lighting.vs", "Shader/lighting.frag");
-	Shader lampShader("Shader/lamp.vs", "Shader/lamp.frag");
+
 
 	//models
 	Model Dog((char*)"Models/RedDog.obj");
@@ -210,24 +276,18 @@ int main()
 		glfwTerminate();
 		return EXIT_FAILURE;
 	}
-	std::cout << "N: giro original | P: iniciar/pausar/reanudar subida y bajada"
-		<< " | Espacio: luz\n";
+	if (!PrepararCabezas()) {
+		std::cerr << "No se pudieron medir RedDog.obj y ball.obj. Revisa Models.\n";
+		glfwDestroyWindow(window); glfwTerminate(); return EXIT_FAILURE;
+	}
+	// Encuadre inicial mas amplio para ver el recorrido completo.
+	camera = Camera(glm::vec3(centroRecorrido.x,
+		alturaContacto + alturaPerro * 0.5f,
+		centroRecorrido.z + radioRecorrido * 3.0f + alturaPerro * 3.0f));
+	std::cout << "B: perro y pelota con cabezazos (iniciar/pausar/reanudar)\n"
+		<< "N: giro original | P: subida y bajada\n";
 
 
-
-	// First, set the container's VAO (and VBO)
-	GLuint VBO, VAO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	// Position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-	glEnableVertexAttribArray(0);
-	// normal attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
 
 	// Set texture units
 	lightingShader.Use();
@@ -281,34 +341,26 @@ int main()
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.specular"), 0.3f, 0.3f, 0.3f);
 
 
-		// Point light 1
-		glm::vec3 lightColor;
-		lightColor.x = abs(sin(glfwGetTime() * Light1.x));
-		lightColor.y = abs(sin(glfwGetTime() * Light1.y));
-		lightColor.z = sin(glfwGetTime() * Light1.z);
-
-
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), pointLightPositions[0].x, pointLightPositions[0].y, pointLightPositions[0].z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].diffuse"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].specular"), 1.0f, 0.2f, 0.2f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].constant"), 1.0f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].linear"), 0.045f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].quadratic"), 0.075f);
-
-
-		// SpotLight
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.position"), camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.direction"), camera.GetFront().x, camera.GetFront().y, camera.GetFront().z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), 0.2f, 0.2f, 0.8f);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), 0.2f, 0.2f, 0.8f);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), 0.0f, 0.0f, 0.0f);
+		// Sin luz puntual ni linterna azul. Solo iluminacion general estable.
+		// Se dejan atenuaciones validas para evitar divisiones por cero en shaders.
+		for (int i = 0; i < 4; ++i) {
+			const std::string base = "pointLights[" + std::to_string(i) + "].";
+			glUniform3f(glGetUniformLocation(lightingShader.Program, (base + "position").c_str()), 0.0f, 10.0f, 0.0f);
+			glUniform3f(glGetUniformLocation(lightingShader.Program, (base + "ambient").c_str()), 0, 0, 0);
+			glUniform3f(glGetUniformLocation(lightingShader.Program, (base + "diffuse").c_str()), 0, 0, 0);
+			glUniform3f(glGetUniformLocation(lightingShader.Program, (base + "specular").c_str()), 0, 0, 0);
+			glUniform1f(glGetUniformLocation(lightingShader.Program, (base + "constant").c_str()), 1.0f);
+			glUniform1f(glGetUniformLocation(lightingShader.Program, (base + "linear").c_str()), 0.0f);
+			glUniform1f(glGetUniformLocation(lightingShader.Program, (base + "quadratic").c_str()), 0.0f);
+		}
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.position"), 0, 10, 0);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.direction"), 0, -1, 0);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), 0, 0, 0);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), 0, 0, 0);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), 0, 0, 0);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 1.0f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.3f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 0.7f);
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.cutOff"), glm::cos(glm::radians(12.0f)));
-		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), glm::cos(glm::radians(18.0f)));
-
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.cutOff"), 0.98f);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), 0.95f);
 
 		// Set material properties
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 5.0f);
@@ -337,7 +389,7 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		Piso.Draw(lightingShader);
 
-		model = glm::mat4(1);
+		model = (modoPelota == MODO_CABEZAZOS) ? matrizPerroAnimada : glm::mat4(1.0f);
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
 		Dog.Draw(lightingShader);
@@ -350,37 +402,11 @@ int main()
 		// T * R: se agrega altura y se conserva exactamente el giro original.
 		model = glm::translate(model, glm::vec3(0.0f, desplazamientoVertical, 0.0f));
 		model = glm::rotate(model, glm::radians(rotBall), glm::vec3(0.0f, 1.0f, 0.0f));
+		if (modoPelota == MODO_CABEZAZOS) model = matrizPelotaAnimada;
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		Ball.Draw(lightingShader);
 		glDisable(GL_BLEND);  //Desactiva el canal alfa 
 		glBindVertexArray(0);
-
-
-		// Also draw the lamp object, again binding the appropriate shader
-		lampShader.Use();
-		// Get location objects for the matrices on the lamp shader (these could be different on a different shader)
-		modelLoc = glGetUniformLocation(lampShader.Program, "model");
-		viewLoc = glGetUniformLocation(lampShader.Program, "view");
-		projLoc = glGetUniformLocation(lampShader.Program, "projection");
-
-		// Set matrices
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-		model = glm::mat4(1);
-		model = glm::translate(model, lightPos);
-		model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		// Draw the light object (using light's vertex attributes)
-
-		model = glm::mat4(1);
-		model = glm::translate(model, pointLightPositions[0]);
-		model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		glBindVertexArray(0);
-
 
 
 		// Swap the screen buffers
@@ -477,21 +503,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		}
 	}
 
-	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-	{
-		active = !active;
-		if (active)
-		{
-			Light1 = glm::vec3(1.0f, 1.0f, 0.0f);
-
+	if (key == GLFW_KEY_B && action == GLFW_PRESS) {
+		AnimBall = false; AnimVertical = false;
+		rotBall = 0.0f; desplazamientoVertical = 0.0f; tiempoVertical = 0.0;
+		if (modoPelota != MODO_CABEZAZOS) {
+			modoPelota = MODO_CABEZAZOS;
+			tiempoCabezas = 0.0;
+			AnimCabezas = true;
+			ActualizarCabezas();
 		}
-		else
-		{
-			Light1 = glm::vec3(0);//Cuado es solo un valor en los 3 vectores pueden dejar solo una componente
+		else {
+			AnimCabezas = !AnimCabezas;
 		}
 	}
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
 	{
+		AnimCabezas = false;
 		AnimBall = false;
 		rotBall = 0.0f; // Volver a la alineacion original con la nariz.
 		if (modoPelota != MODO_VERTICAL) {
@@ -506,6 +533,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	}
 	if (key == GLFW_KEY_N && action == GLFW_PRESS)
 	{
+		AnimCabezas = false;
 		AnimVertical = false;
 		desplazamientoVertical = 0.0f;
 		tiempoVertical = 0.0;
@@ -520,6 +548,13 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	}
 }
 void Animation() {
+	if (modoPelota == MODO_CABEZAZOS) {
+		if (AnimCabezas) {
+			tiempoCabezas = std::fmod(tiempoCabezas + static_cast<double>(deltaTime), SEGUNDOS_VUELTA);
+			ActualizarCabezas();
+		}
+		return; // No mezclar este recorrido con las animaciones anteriores.
+	}
 	// Al pausar no cambia ni el tiempo acumulado ni el desplazamiento.
 	// P reanuda desde ese mismo punto, sin reiniciar ni saltar por el tiempo pausado.
 	if (AnimVertical) {
