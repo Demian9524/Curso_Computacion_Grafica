@@ -29,7 +29,7 @@
     <None Include="Shader\lighting.vs" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Animación_PerroPelota.cpp" />
+    <ClCompile Include="Maquina de estados.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
