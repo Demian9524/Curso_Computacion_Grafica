@@ -1,7 +1,8 @@
-// Previo practica #11
+// Practica #11
 // Bello Zaragoza Demian
-// Fecha de entrega: 26 de octubre de 2026
+// Fecha de entrega: 31 de octubre de 2026
 // Número de cuenta: 320200928
+// Recorrido adicional: P inicia/pausa/reanuda; R reinicia; B caminata original.
 
 #include <iostream>
 #include <cmath>
@@ -19,7 +20,7 @@
 // Other Libs
 #include "stb_image.h"
 
-// GLM Mathematics
+// GLM MathematicsPráctica 11 (animación por maquina de estados)
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -187,6 +188,176 @@ static void DetenerPerro() {
 	step = false;
 }
 
+// Nueva animacion: P inicia/pausa/reanuda. R reinicia.
+// Izquierda = -X, frente = +Z, fondo = -Z (vista inicial).
+// El suelo se supone rectangular, sin rotacion ni escala.
+enum FaseRuta { RUTA_INACTIVA, RUTA_CAMINAR, RUTA_MIRAR, RUTA_GIRAR };
+FaseRuta faseRuta = RUTA_INACTIVA;
+bool modoRuta = false, pausaRuta = false, rutaDisponible = false;
+glm::vec3 puntosRuta[5];
+int destinoRuta = 1;
+float cabezaYaw = 0.0f;
+float tiempoRuta = 0.0f, fasePasoRuta = 0.0f;
+float giroDesde = 0.0f, giroCambio = 0.0f, velocidadRuta = 0.5f;
+const float DURACION_CAMINATA = 14.0f; // Segundos en movimiento, sin contar giros.
+const float TIEMPO_MIRADA = 0.4f, TIEMPO_GIRO = 0.75f;
+
+static float SuaveRuta(float t) {
+	t = glm::clamp(t, 0.0f, 1.0f);
+	return t * t * (3.0f - 2.0f * t);
+}
+static float DiferenciaAngulo(float desde, float hasta) {
+	return std::fmod(hasta - desde + 540.0f, 360.0f) - 180.0f;
+}
+static void PoseRutaReposo() {
+	FLegs = RLegs = head = tail = 0.0f;
+}
+static void ReiniciarPerro() {
+	modoRuta = pausaRuta = false;
+	faseRuta = RUTA_INACTIVA;
+	destinoRuta = 1;
+	cabezaYaw = tiempoRuta = fasePasoRuta = 0.0f;
+	dogPos = glm::vec3(0.0f);
+	dogRot = 0.0f;
+	PoseRutaReposo();
+	step = false;
+	dogAnim = REPOSO;
+}
+
+static bool PrepararRuta() {
+	// Medir piso en X/Z y reservar un radio que cubre al perro al girar.
+	std::ifstream piso("Models/piso.obj");
+	float loX = (std::numeric_limits<float>::max)(), hiX = -loX;
+	float loZ = loX, hiZ = -loX;
+	bool leido = false;
+	std::string linea, tipo;
+	while (std::getline(piso, linea)) {
+		std::istringstream in(linea);
+		float x, y, z;
+		if ((in >> tipo) && tipo == "v" && (in >> x >> y >> z)) {
+			loX = glm::min(loX, x); hiX = glm::max(hiX, x);
+			loZ = glm::min(loZ, z); hiZ = glm::max(hiZ, z);
+			leido = true;
+		}
+	}
+	if (!leido) return false;
+	const char* rutas[] = { "Models/DogBody.obj", "Models/HeadDog.obj",
+		"Models/TailDog.obj", "Models/F_LeftLegDog.obj", "Models/F_RightLegDog.obj",
+		"Models/B_LeftLegDog.obj", "Models/B_RightLegDog.obj" };
+	const glm::vec3 montajes[] = { glm::vec3(0), glm::vec3(0, .093f, .208f),
+		glm::vec3(0, .026f, -.288f), glm::vec3(.112f, -.044f, .074f),
+		glm::vec3(-.111f, -.055f, .074f), glm::vec3(.082f, -.046f, -.218f),
+		glm::vec3(-.083f, -.057f, -.231f) };
+	float radio = 0.0f;
+	for (int i = 0; i < 7; ++i) {
+		std::ifstream obj(rutas[i]);
+		bool encontrado = false;
+		while (std::getline(obj, linea)) {
+			std::istringstream in(linea);
+			float x, y, z;
+			if ((in >> tipo) && tipo == "v" && (in >> x >> y >> z)) {
+				// Cota conservadora: cubre rotaciones locales y giro del cuerpo.
+				float alcance = glm::length(glm::vec2(montajes[i].x, montajes[i].z))
+					+ glm::length(glm::vec3(x, y, z));
+				radio = glm::max(radio, alcance);
+				encontrado = true;
+			}
+		}
+		if (!encontrado) return false;
+	}
+	float margen = radio + MARGEN_BORDE;
+	float izquierda = loX + margen, derecha = hiX - margen;
+	float frente = hiZ - margen, fondo = loZ + margen;
+	if (izquierda >= derecha || fondo >= frente) return false;
+	glm::vec3 centro((loX + hiX) * .5f, 0.0f, (loZ + hiZ) * .5f);
+	// Ciclo del dibujo: A -> B (derecha) -> C -> D -> E -> A.
+	puntosRuta[0] = glm::vec3(centro.x, 0.0f, frente); // A: frente, al centro
+	puntosRuta[1] = glm::vec3(derecha, 0.0f, frente);  // B: esquina derecha del frente
+	puntosRuta[2] = glm::vec3(izquierda, 0.0f, fondo); // C: esquina izquierda de atras
+	puntosRuta[3] = glm::vec3(derecha, 0.0f, fondo);   // D: esquina derecha de atras
+	puntosRuta[4] = centro;                          // E: centro del piso
+	float longitud = 0.0f;
+	for (int i = 0; i < 5; ++i)
+		longitud += glm::length(puntosRuta[(i + 1) % 5] - puntosRuta[i]);
+	velocidadRuta = longitud / DURACION_CAMINATA;
+	return true;
+}
+
+static void IniciarRuta() {
+	if (!rutaDisponible) {
+		std::cerr << "No hay espacio seguro para el recorrido. Revisa piso y modelos.\n";
+		return;
+	}
+	// Conservar la posicion actual: desde el centro se camina primero a A.
+	// Tambien evita saltos si se cambia desde la caminata original con B.
+	glm::vec3 posicionActual = dogPos;
+	float orientacionActual = dogRot;
+	ReiniciarPerro();
+	dogPos = posicionActual;
+	dogRot = orientacionActual;
+	modoRuta = true;
+	destinoRuta = 0; // Primer destino A; despues sigue derecha, C, D, E, A...
+	glm::vec3 direccion = puntosRuta[0] - dogPos;
+	giroDesde = dogRot;
+	giroCambio = glm::length(direccion) > 0.000001f
+		? DiferenciaAngulo(dogRot, glm::degrees(std::atan2(direccion.x, direccion.z)))
+		: 0.0f;
+	faseRuta = std::abs(giroCambio) > 0.01f ? RUTA_MIRAR : RUTA_CAMINAR;
+	std::cout << "Ciclo: A -> derecha -> C -> D -> E (centro) -> A. P pausa/reanuda.\n";
+}
+
+static void ActualizarRuta(float dt) {
+	if (pausaRuta) return;
+	if (faseRuta == RUTA_CAMINAR) {
+		glm::vec3 delta = puntosRuta[destinoRuta] - dogPos;
+		float distancia = glm::length(delta);
+		float pasoRuta = glm::min(velocidadRuta * dt, distancia);
+		if (distancia > 0.000001f) dogPos += delta * (pasoRuta / distancia);
+		// Balanceo vinculado al avance. No caminar en el lugar durante la mirada.
+		fasePasoRuta += pasoRuta / velocidadRuta * 8.0f;
+		FLegs = RLegs = 15.0f * std::sin(fasePasoRuta);
+		head = 4.0f * std::sin(fasePasoRuta);
+		tail = 10.0f * std::sin(fasePasoRuta);
+		if (distancia <= velocidadRuta * dt + 0.000001f) {
+			dogPos = puntosRuta[destinoRuta];
+			PoseRutaReposo();
+			// Al llegar a E, ir a A; al llegar a A, repetir hacia B.
+			// Solo se cambia el destino: no se reinicia ni teletransporta al perro.
+			destinoRuta = (destinoRuta + 1) % 5;
+			glm::vec3 direccion = puntosRuta[destinoRuta] - dogPos;
+			float angulo = glm::degrees(std::atan2(direccion.x, direccion.z));
+			giroDesde = dogRot;
+			giroCambio = DiferenciaAngulo(dogRot, angulo);
+			tiempoRuta = 0.0f;
+			faseRuta = RUTA_MIRAR;
+		}
+	}
+	else if (faseRuta == RUTA_MIRAR) {
+		tiempoRuta += dt;
+		cabezaYaw = glm::clamp(giroCambio, -40.0f, 40.0f)
+			* SuaveRuta(tiempoRuta / TIEMPO_MIRADA);
+		if (tiempoRuta >= TIEMPO_MIRADA) {
+			tiempoRuta = 0.0f;
+			faseRuta = RUTA_GIRAR;
+		}
+	}
+	else if (faseRuta == RUTA_GIRAR) {
+		tiempoRuta += dt;
+		float t = glm::clamp(tiempoRuta / TIEMPO_GIRO, 0.0f, 1.0f);
+		float s = SuaveRuta(t);
+		dogRot = giroDesde + giroCambio * s;
+		cabezaYaw = glm::clamp(giroCambio, -40.0f, 40.0f) * (1.0f - s);
+		FLegs = RLegs = 7.0f * std::sin(t * 12.5663706f) * std::sin(t * 3.14159265f);
+		if (t >= 1.0f) {
+			dogRot = std::fmod(dogRot + 360.0f, 360.0f);
+			cabezaYaw = 0.0f;
+			PoseRutaReposo();
+			fasePasoRuta = 0.0f;
+			faseRuta = RUTA_CAMINAR;
+		}
+	}
+}
+
 // Deltatime
 GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
 GLfloat lastFrame = 0.0f;  	// Time of last frame
@@ -203,7 +374,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo practica #11  Bello Zaragoza Demian", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica #11  Bello Zaragoza Demian", nullptr, nullptr);
 
 	if (nullptr == window)
 	{
@@ -242,7 +413,7 @@ int main()
 
 
 	Shader lightingShader("Shader/lighting.vs", "Shader/lighting.frag");
-	Shader lampShader("Shader/lamp.vs", "Shader/lamp.frag");
+
 
 	//models
 	Model DogBody((char*)"Models/DogBody.obj");
@@ -260,6 +431,10 @@ int main()
 
 
 
+
+	rutaDisponible = PrepararRuta();
+	std::cout << "P: recorrido nuevo / pausa / reanudar | B: caminata original | R: reiniciar\n";
+	if (!rutaDisponible) std::cerr << "No se pudo preparar el recorrido adicional.\n";
 
 	// First, set the container's VAO (and VBO)
 	GLuint VBO, VAO;
@@ -394,6 +569,7 @@ int main()
 		//Head
 		model = modelTemp;
 		model = glm::translate(model, glm::vec3(0.0f, 0.093f, 0.208f));
+		model = glm::rotate(model, glm::radians(cabezaYaw), glm::vec3(0.0f, 1.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(head), glm::vec3(0.0f, 0.0f, 1.0f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		HeadDog.Draw(lightingShader);
@@ -441,32 +617,7 @@ int main()
 		glBindVertexArray(0);
 
 
-		// Also draw the lamp object, again binding the appropriate shader
-		lampShader.Use();
-		// Get location objects for the matrices on the lamp shader (these could be different on a different shader)
-		modelLoc = glGetUniformLocation(lampShader.Program, "model");
-		viewLoc = glGetUniformLocation(lampShader.Program, "view");
-		projLoc = glGetUniformLocation(lampShader.Program, "projection");
-
-		// Set matrices
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-		model = glm::mat4(1);
-		model = glm::translate(model, lightPos);
-		model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		// Draw the light object (using light's vertex attributes)
-
-		model = glm::mat4(1);
-		model = glm::translate(model, pointLightPositions[0]);
-		model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		glBindVertexArray(0);
-
-
+		// Se omite el cubo que representaba la luz.
 
 		// Swap the screen buffers
 		glfwSwapBuffers(window);
@@ -580,16 +731,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		AnimBall = !AnimBall;
 
 	}
+	if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+		if (!modoRuta) IniciarRuta();
+		else pausaRuta = !pausaRuta;
+	}
 	if (key == GLFW_KEY_B && action == GLFW_PRESS) {
+		if (modoRuta) ReiniciarPerro();
 		// No reiniciar la marcha si ya llego al borde.
 		if (dogAnim != DETENIDO && dogPos.z < limiteDogZ) dogAnim = CAMINANDO;
 	}
 	if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-		dogPos = glm::vec3(0.0f);
-		dogRot = 0.0f;
-		FLegs = RLegs = head = tail = 0.0f;
-		step = false;
-		dogAnim = REPOSO;
+		ReiniciarPerro();
 	}
 
 }
@@ -604,6 +756,11 @@ void Animation() {
 	{
 		rotDog -= 0.6f;
 		//printf("%f", rotBall);
+	}
+
+	if (modoRuta) {
+		ActualizarRuta(glm::clamp(deltaTime, 0.0f, 0.05f));
+		return;
 	}
 
 	if (dogAnim == CAMINANDO) {	//walk animation
