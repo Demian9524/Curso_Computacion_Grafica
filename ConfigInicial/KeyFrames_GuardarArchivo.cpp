@@ -1,10 +1,14 @@
-// Practica #11
+// Previo practica #12
 // Bello Zaragoza Demian
-// Fecha de entrega: 31 de octubre de 2026
+// Fecha de entrega: 2 de noviembre de 2026
 // Número de cuenta: 320200928
-// P inicia/pausa/reanuda. F1 muestra todos los controles en la consola.
 
 
+// Persistencia: K registra y guarda; al iniciar se recupera el TXT.
+// Se conservan los controles, el saludo de referencia y los modelos originales.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -16,6 +20,13 @@
 #include <string>
 #include <limits>
 #include <cstdlib>
+#include <locale>
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // GLEW
 #include <GL/glew.h>
@@ -79,7 +90,7 @@ enum Canal {
     CABEZA_Z, CABEZA_X, CABEZA_Y,
     PATA_DI_X, PATA_DD_X, PATA_TI_X, PATA_TD_X,
     PATA_DI_Z, PATA_DD_Z, PATA_TI_Z, PATA_TD_Z,
-    COLA_Z, COLA_Y, NUM_CANALES
+    COLA_Z, COLA_Y, VUELCO_CUERPO, NUM_CANALES
 };
 struct Pose { std::array<float, NUM_CANALES> v{}; };
 struct FRAME {
@@ -96,6 +107,11 @@ int parteSeleccionada = 0;
 bool girarPelota = false;
 float rotBall = 0.0f;
 const char* ARCHIVO_POSES = "Previo12_Keyframes.txt";
+bool posesPendientes = false; // Solo poses grabadas o guardadas explicitamente.
+bool ExportarPoses();
+bool ImportarPoses(bool alIniciar = false);
+void IniciarSecuencia();
+bool GuardarAntesDeSalir();
 const char* nombresPartes[] = {
     "cuerpo", "cabeza", "pata delantera izquierda", "pata delantera derecha",
     "pata trasera izquierda", "pata trasera derecha", "cola"
@@ -130,7 +146,10 @@ void AgregarPose(const Pose& p, float segundos) {
     KeyFrame.push_back(f);
 }
 void CargarSaludo() {
+    // Antes de sustituir una grabacion, intentar conservarla en disco.
+    if (posesPendientes && !ExportarPoses()) return;
     Detener(); KeyFrame.clear(); poseActual = Pose{};
+    posesPendientes = false; // El ejemplo no sobrescribe automaticamente el TXT.
     Pose p;
     AgregarPose(p, 0.6f); // De pie.
     p.v[INCLINACION_CUERPO] = -10.0f;
@@ -173,17 +192,87 @@ void CargarSaludo() {
     AgregarPose(Pose{}, 0.5f);
     std::cout << "Saludo listo: " << KeyFrame.size() << " poses. Pulsa P o L.\n";
 }
+// F4: referencia por keyframes. El cuerpo rota sobre su eje longitudinal Z.
+// No es una vuelta de pie: primero se recogen los apoyos, se acuesta de lado
+// y despues descansa sobre el lomo. Cada pata sigue siendo una pieza rigida.
+void CargarMuertito() {
+    if (posesPendientes && !ExportarPoses()) return;
+    Detener(); KeyFrame.clear();
+    posesPendientes = false; // F5 guarda este ejemplo cuando el usuario lo elija.
+    // Mantener la postura visible; Comenzar interpolara hacia el primer frame.
+    Pose p;
+    p.v[POS_X] = poseActual.v[POS_X];
+    p.v[POS_Z] = poseActual.v[POS_Z];
+    p.v[GIRO_CUERPO] = poseActual.v[GIRO_CUERPO];
+    AgregarPose(p, 0.9f); // Partir de pie, en el mismo lugar.
+
+    p.v[INCLINACION_CUERPO] = -8.0f;
+    p.v[PATA_DI_X] = p.v[PATA_DD_X] = -35.0f;
+    p.v[PATA_TI_X] = p.v[PATA_TD_X] = -50.0f;
+    p.v[CABEZA_X] = 12.0f;
+    p.v[COLA_Z] = 8.0f;
+    AgregarPose(p, 0.9f); // Recoger las patas y bajar el cuerpo hacia el piso.
+
+    p.v[VUELCO_CUERPO] = 45.0f;
+    p.v[PATA_DI_X] = -65.0f; p.v[PATA_DD_X] = -45.0f;
+    p.v[PATA_TI_X] = -75.0f; p.v[PATA_TD_X] = -60.0f;
+    p.v[CABEZA_Z] = -8.0f;
+    AgregarPose(p, 0.8f); // Inclinarse suavemente hacia un costado.
+
+    p.v[VUELCO_CUERPO] = 92.0f;
+    p.v[INCLINACION_CUERPO] = 0.0f;
+    p.v[PATA_DI_X] = -65.0f; p.v[PATA_DD_X] = -60.0f;
+    p.v[PATA_TI_X] = -70.0f; p.v[PATA_TD_X] = -65.0f;
+    p.v[CABEZA_X] = 6.0f; p.v[CABEZA_Z] = 0.0f;
+    p.v[COLA_Z] = 0.0f;
+    AgregarPose(p, 1.0f); // Quedar acostado de lado.
+    AgregarPose(p, 0.5f);
+
+    p.v[VUELCO_CUERPO] = 140.0f;
+    p.v[PATA_DI_X] = -45.0f; p.v[PATA_DD_X] = -50.0f;
+    p.v[PATA_TI_X] = -55.0f; p.v[PATA_TD_X] = -50.0f;
+    p.v[PATA_DI_Z] = -10.0f; p.v[PATA_DD_Z] = 10.0f;
+    p.v[PATA_TI_Z] = -8.0f; p.v[PATA_TD_Z] = 8.0f;
+    AgregarPose(p, 0.9f); // Rodar del costado hacia el lomo.
+
+    p.v[VUELCO_CUERPO] = 175.0f;
+    p.v[PATA_DI_X] = -35.0f; p.v[PATA_DD_X] = -42.0f;
+    p.v[PATA_TI_X] = -48.0f; p.v[PATA_TD_X] = -42.0f;
+    p.v[CABEZA_X] = 8.0f; p.v[CABEZA_Y] = 10.0f;
+    AgregarPose(p, 1.0f); // Panza arriba, patitas recogidas y ligera asimetria.
+    p.v[VUELCO_CUERPO] = 170.0f;
+    p.v[CABEZA_Y] = 15.0f;
+    AgregarPose(p, 0.45f); // Asentarse sobre el piso.
+    AgregarPose(p, 3.0f); // Hacerse el muerto: quedarse quieto, sin mover la cola.
+    // Al terminar conserva esta postura; R vuelve al inicio, P repite.
+    std::cout << "Muertito listo: " << KeyFrame.size()
+        << " poses. P reproduce; F5 guarda esta animacion en el TXT.\n";
+}
 void saveFrame() {
     if (iniciada) { std::cout << "Pulsa R antes de editar/grabar poses.\n"; return; }
     if (KeyFrame.size() >= MAX_FRAMES) { std::cout << "Limite de poses alcanzado.\n"; return; }
     AgregarPose(poseActual, duracionManual);
-    std::cout << "Pose " << KeyFrame.size() << " guardada; duracion " << duracionManual << " s.\n";
+    posesPendientes = true;
+    std::cout << "Pose " << KeyFrame.size() << " registrada; duracion " << duracionManual << " s.\n";
+    if (!ExportarPoses())
+        std::cerr << "La pose sigue en memoria. F5 reintenta; se reintentara al cerrar.\n";
 }
 void Comenzar() {
     if (KeyFrame.size() < 2) { std::cout << "Necesitas al menos dos poses (K).\n"; return; }
     // Transicion desde la pose visible al primer keyframe: nunca teletransportar.
     origenTramo = poseActual; destino = 0; tiempoTramo = 0.0f;
     play = iniciada = true; pausa = false;
+}
+// Una pulsacion selecciona e inicia; otra vuelve al primer tramo.
+void ReproducirReferencia(bool muertito) {
+    if (posesPendientes && !ExportarPoses()) return;
+    const Pose visible = poseActual;
+    if (muertito) CargarMuertito();
+    else CargarSaludo();
+    // El saludo original reinicia la postura al cargar; conservar la visible
+    // permite volver al principio con una transicion, sin un salto instantaneo.
+    poseActual = visible;
+    Comenzar();
 }
 void ActualizarKeyframes(float dt) {
     if (!play || pausa || dt <= 0.0f || !std::isfinite(dt)) return;
@@ -201,38 +290,111 @@ void ActualizarKeyframes(float dt) {
         }
     }
 }
+// V2: duracion y 19 canales, incluido el vuelco del cuerpo.
+// El lector conserva compatibilidad con V1 (18 canales, vuelco = 0).
 bool ExportarPoses() {
-    if (KeyFrame.size() < 2) { std::cout << "Graba al menos dos poses antes de exportar.\n"; return false; }
-    std::ofstream f(ARCHIVO_POSES);
-    if (!f) { std::cerr << "No se pudo escribir " << ARCHIVO_POSES << '\n'; return false; }
-    f << "PREVIO12_KEYFRAMES_V1\n" << KeyFrame.size() << '\n' << std::setprecision(9);
+    if (KeyFrame.empty()) {
+        std::cout << "No hay poses: se conserva el archivo anterior.\n";
+        return false;
+    }
+    posesPendientes = true;
+    if (KeyFrame.size() > MAX_FRAMES) return false;
+    for (const FRAME& k : KeyFrame) {
+        if (!std::isfinite(k.segundos) || k.segundos < 0.1f || k.segundos > 10.0f) {
+            std::cerr << "Duracion invalida: no se cambio el archivo.\n"; return false;
+        }
+        for (float x : k.pose.v) {
+            if (!std::isfinite(x) || std::fabs(x) > 10000.0f) {
+                std::cerr << "Canal fuera de rango: no se cambio el archivo.\n"; return false;
+            }
+        }
+    }
+    const std::string temporal = std::string(ARCHIVO_POSES) + ".tmp";
+    std::ofstream f(temporal.c_str(), std::ios::out | std::ios::trunc);
+    f.imbue(std::locale::classic());
+    if (!f) {
+        std::cerr << "No se pudo escribir " << temporal << ". Revisa los permisos del directorio de trabajo.\n";
+        return false;
+    }
+    f << "PREVIO12_KEYFRAMES_V2\n" << KeyFrame.size() << '\n'
+        << std::setprecision(std::numeric_limits<float>::max_digits10);
     for (const FRAME& k : KeyFrame) {
         f << k.segundos;
         for (float x : k.pose.v) f << ' ' << x;
         f << '\n';
     }
-    if (!f) { std::cerr << "Error al guardar las poses.\n"; return false; }
-    std::cout << "Guardado: " << ARCHIVO_POSES << " (directorio de trabajo).\n";
+    f.flush();
+    bool completo = static_cast<bool>(f);
+    f.close();
+    completo = completo && !f.fail();
+    if (!completo) {
+        std::remove(temporal.c_str());
+        std::cerr << "Error de escritura: se conserva el archivo anterior.\n";
+        return false;
+    }
+    // Sustituir solo despues de cerrar correctamente el temporal.
+#ifdef _WIN32
+    if (!MoveFileExA(temporal.c_str(), ARCHIVO_POSES,
+        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        std::cerr << "No se pudo sustituir el TXT. Error Windows: " << GetLastError() << '\n';
+        return false;
+    }
+#else
+    if (std::rename(temporal.c_str(), ARCHIVO_POSES) != 0) {
+        std::cerr << "No se pudo sustituir el TXT: " << std::strerror(errno) << '\n';
+        return false;
+    }
+#endif
+    posesPendientes = false;
+    std::cout << "Guardado en " << ARCHIVO_POSES << ": " << KeyFrame.size()
+        << " keyframes (directorio de trabajo).\n";
     return true;
 }
-bool ImportarPoses() {
+bool ImportarPoses(bool alIniciar) {
     std::ifstream f(ARCHIVO_POSES);
-    std::string firma; int cantidad = 0;
-    if (!(f >> firma >> cantidad) || firma != "PREVIO12_KEYFRAMES_V1" || cantidad < 2 || cantidad > MAX_FRAMES) {
-        std::cerr << "Archivo de poses inexistente o invalido.\n"; return false;
+    f.imbue(std::locale::classic());
+    if (!f) {
+        std::cout << "No se pudo abrir " << ARCHIVO_POSES
+            << (alIniciar ? "; se usara la referencia del muertito.\n" : ". No se cambio la secuencia.\n");
+        return false;
     }
+    std::string firma; int cantidad = 0;
+    if (!(f >> firma >> cantidad) || (firma != "PREVIO12_KEYFRAMES_V1" && firma != "PREVIO12_KEYFRAMES_V2") || cantidad < 1 || cantidad > MAX_FRAMES) {
+        std::cerr << "Cabecera de poses invalida. No se cambio la secuencia.\n"; return false;
+    }
+    const int canalesArchivo = firma == "PREVIO12_KEYFRAMES_V1" ? 18 : NUM_CANALES;
     std::vector<FRAME> nuevas;
+    nuevas.reserve(cantidad);
     for (int i = 0; i < cantidad; ++i) {
         FRAME k;
-        if (!(f >> k.segundos) || !std::isfinite(k.segundos) || k.segundos < 0.1f || k.segundos > 10.0f) return false;
-        for (float& x : k.pose.v)
-            if (!(f >> x) || !std::isfinite(x) || std::fabs(x) > 10000.0f) return false;
+        if (!(f >> k.segundos) || !std::isfinite(k.segundos) || k.segundos < 0.1f || k.segundos > 10.0f) {
+            std::cerr << "Duracion invalida en keyframe " << i + 1 << '\n'; return false;
+        }
+        for (int c = 0; c < canalesArchivo; ++c) {
+            float& x = k.pose.v[c];
+            if (!(f >> x) || !std::isfinite(x) || std::fabs(x) > 10000.0f) {
+                std::cerr << "Canal invalido o archivo incompleto en keyframe " << i + 1 << '\n'; return false;
+            }
+        }
         nuevas.push_back(k);
     }
-    // Solo reemplazar la secuencia cuando TODO el archivo sea valido.
-    Detener(); KeyFrame.swap(nuevas);
-    std::cout << "Poses cargadas. P/L reproduce desde la postura actual.\n";
+    f >> std::ws;
+    if (!f.eof() || f.bad()) {
+        std::cerr << "Contenido sobrante o error de lectura en el TXT.\n"; return false;
+    }
+    // No cambiar ninguna pose hasta validar el archivo completo.
+    Detener(); KeyFrame.swap(nuevas); posesPendientes = false;
+    if (alIniciar) poseActual = KeyFrame.front().pose;
+    std::cout << "Recuperados " << KeyFrame.size() << " keyframes. P/L reproduce.\n";
     return true;
+}
+void IniciarSecuencia() {
+    if (!ImportarPoses(true)) CargarMuertito();
+    // Cargar no reproduce automaticamente: el usuario inicia con P.
+}
+bool GuardarAntesDeSalir() {
+    if (!posesPendientes) return true;
+    return ExportarPoses();
 }
 // END_KEYFRAME_CORE
 
@@ -255,6 +417,8 @@ bool ajustarApoyo = false;
 glm::mat4 MatrizPieza(const Pose& p, int pieza) {
     glm::mat4 m(1.0f);
     const glm::vec3 cadera(0.0f, -0.05f, -0.22f);
+    // Vuelco global de TODAS las piezas, antes de la inclinacion y articulaciones.
+    m = glm::rotate(m, glm::radians(p.v[VUELCO_CUERPO]), glm::vec3(0, 0, 1));
     m = glm::translate(m, cadera);
     m = glm::rotate(m, glm::radians(p.v[INCLINACION_CUERPO]), glm::vec3(1, 0, 0));
     m = glm::translate(m, -cadera);
@@ -279,9 +443,8 @@ glm::mat4 MatrizPieza(const Pose& p, int pieza) {
 }
 float MinimoApoyo(const Pose& p) {
     float minimo = (std::numeric_limits<float>::max)();
-    // Cuerpo y cuatro patas: calculo con los vertices reales, no con una caja grande.
+    // Incluir cabeza y cola: al rodar tambien pueden tocar el piso.
     for (int i = 0; i < NUM_PIEZAS; ++i) {
-        if (i == CABEZA || i == COLA) continue;
         glm::mat4 m = MatrizPieza(p, i);
         for (const glm::vec3& v : verticesApoyo[i])
             minimo = (std::min)(minimo, (m * glm::vec4(v, 1.0f)).y);
@@ -293,7 +456,7 @@ void PrepararApoyo() {
     // POS_Y sigue disponible como desplazamiento manual adicional.
     ajustarApoyo = true;
     for (int i = 0; i < NUM_PIEZAS; ++i) {
-        if (i == CABEZA || i == COLA) continue;
+        verticesApoyo[i].clear();
         std::ifstream archivo(rutasPerro[i]); std::string linea, tipo;
         while (std::getline(archivo, linea)) {
             std::istringstream datos(linea); glm::vec3 v;
@@ -308,16 +471,20 @@ void PrepararApoyo() {
 void Ayuda() {
     std::cout << "\nPREVIO 12 - Bello Zaragoza Demian - 320200928\n"
         "P: iniciar/pausar/reanudar | L: reproducir desde la pose visible\n"
-        "F2: preparar saludo | R: detener y volver a la primera pose\n"
-        "F3: vaciar secuencia para grabar | K: guardar pose actual\n"
+        "1: reproducir/repetir saludo | 6: reproducir/repetir muertito\n"
+        "R: detener/volver al inicio | F2/F4: preparar ejemplos sin reproducir\n"
+        "F3: nueva secuencia | K: registrar pose y guardar en TXT\n"
         "F5: exportar poses TXT | F9: cargar poses TXT\n"
         "TAB: elegir cuerpo/cabeza/4 patas/cola | Z/X: angulo principal\n"
         "C/V: angulo secundario | 2/3: giro cuerpo | 4/5: cabeza\n"
+        "Q/E: vuelco del cuerpo (de lado/panza arriba), tambien se graba con K\n"
         "G/J: posicion X | Y/H: posicion Z | T/U: altura del perro\n"
         "Menos/Igual: duracion del siguiente keyframe (0.1 a 10 s)\n"
         "WASD/flechas y mouse: camara | M: liberar/capturar mouse\n"
         "N: giro pelota | Espacio: luz variable | F1: ayuda | Esc: salir\n"
-        "F5 guarda las poses; el video MP4 se graba con una captura de pantalla externa.\n\n";
+        "Se carga el TXT al iniciar; K guarda y al cerrar se reintenta si hubo error.\n"
+        "1/6 inician y reinician la animacion; P pausa/reanuda; F5 guarda.\n"
+        "El TXT contiene keyframes, no video; el MP4 se captura por separado.\n\n";
 }
 
 
@@ -337,7 +504,7 @@ int main()
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);*/
 
     // Create a GLFWwindow object that we can use for GLFW's functions
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Previo practica #12 - Bello Zaragoza Demian - 320200928", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Practica #12 - Bello Zaragoza Demian ", nullptr, nullptr);
 
     if (nullptr == window)
     {
@@ -394,7 +561,7 @@ int main()
 
 
     PrepararApoyo();
-    CargarSaludo();
+    IniciarSecuencia();
     Ayuda();
 
     // Set texture units
@@ -406,7 +573,7 @@ int main()
     lastFrame = static_cast<float>(glfwGetTime());
 
     // Game loop
-    while (!glfwWindowShouldClose(window))
+    while (true)
     {
 
         // Calculate deltatime of current frame
@@ -416,6 +583,14 @@ int main()
 
         // Check if any events have been activiated (key pressed, mouse moved etc.) and call corresponding response functions
         glfwPollEvents();
+        if (glfwWindowShouldClose(window)) {
+            // ESC y la X de la ventana recorren la misma salida con guardado.
+            if (GuardarAntesDeSalir()) break;
+            glfwSetWindowShouldClose(window, GLFW_FALSE);
+            if (iniciada) pausa = true;
+            std::fill(keys, keys + 1024, false);
+            std::cerr << "No se cerro: hay poses sin guardar. Revisa permisos y pulsa F5.\n";
+        }
         DoMovement();
         if (SCREEN_WIDTH <= 0 || SCREEN_HEIGHT <= 0) continue;
         Animation();
@@ -565,6 +740,7 @@ void DoMovement()
     if (iniciada) return;
     const float giro = 55.0f * deltaTime;
     const float paso = 0.35f * deltaTime;
+    poseActual.v[VUELCO_CUERPO] += (int(keys[GLFW_KEY_E]) - int(keys[GLFW_KEY_Q])) * giro;
     poseActual.v[POS_X] += (int(keys[GLFW_KEY_J]) - int(keys[GLFW_KEY_G])) * paso;
     poseActual.v[POS_Z] += (int(keys[GLFW_KEY_H]) - int(keys[GLFW_KEY_Y])) * paso;
     poseActual.v[POS_Y] += (int(keys[GLFW_KEY_T]) - int(keys[GLFW_KEY_U])) * paso;
@@ -592,17 +768,24 @@ void KeyCallback(GLFWwindow* window, int key, int, int action, int)
         if (!iniciada) Comenzar();
         else { pausa = !pausa; std::cout << (pausa ? "Pausa.\n" : "Reanudado.\n"); }
         break;
+    case GLFW_KEY_1: ReproducirReferencia(false); break;
+    case GLFW_KEY_6: ReproducirReferencia(true); break;
     case GLFW_KEY_L: Comenzar(); break;
     case GLFW_KEY_K: saveFrame(); break;
     case GLFW_KEY_R:
         Detener(); poseActual = KeyFrame.empty() ? Pose{} : KeyFrame.front().pose; break;
     case GLFW_KEY_F1: Ayuda(); break;
     case GLFW_KEY_F2: CargarSaludo(); break;
+    case GLFW_KEY_F4: CargarMuertito(); break;
     case GLFW_KEY_F3:
+        if (posesPendientes && !ExportarPoses()) break;
+        // Una secuencia vacia NO borra el TXT: K guardara la primera pose nueva.
+        posesPendientes = false;
         Detener(); KeyFrame.clear(); poseActual = Pose{};
-        std::cout << "Secuencia vacia. K guarda cada pose; F2 recupera el saludo.\n"; break;
+        std::cout << "Secuencia vacia. K guarda cada pose; F2: saludo, F4: muertito.\n"; break;
     case GLFW_KEY_F5: ExportarPoses(); break;
     case GLFW_KEY_F9:
+        if (posesPendientes && !ExportarPoses()) break;
         if (!ImportarPoses()) std::cerr << "No se cambio la secuencia actual.\n";
         break;
     case GLFW_KEY_TAB:

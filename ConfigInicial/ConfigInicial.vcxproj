@@ -29,7 +29,7 @@
     <None Include="Shader\lighting.vs" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="KeyFrames.cpp" />
+    <ClCompile Include="KeyFrames_GuardarArchivo.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
